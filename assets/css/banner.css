@@ -1,0 +1,625 @@
+/* ===================================================================
+   Converta Cookie Banner – Dark Teal & Pink Theme
+   Exact colors from reference design
+   =================================================================== */
+
+:root {
+    --pcc-bg:           #0b1426;
+    --pcc-card:         #111d38;
+    --pcc-card-border:  rgba(56,130,200,0.2);
+    --pcc-text:         #b8c5d8;
+    --pcc-text-muted:   #7b8da6;
+    --pcc-heading:      #ffffff;
+    --pcc-teal:         #3bb8a0;
+    --pcc-teal-dark:    #2ea08a;
+    --pcc-pink:         #e83e72;
+    --pcc-pink-dark:    #d12d60;
+    --pcc-badge-bg:     rgba(59,184,160,0.15);
+    --pcc-badge-text:   #3bb8a0;
+    --pcc-tag-bg:       #162950;
+    --pcc-tag-border:   rgba(59,184,160,0.3);
+    --pcc-radius:       20px;
+    --pcc-radius-sm:    14px;
+}
+
+/* ── Overlay ── */
+.pcc-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    background: rgba(5, 10, 25, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ── Main banner ── */
+.pcc-banner {
+    background: var(--pcc-bg);
+    border: 1px solid var(--pcc-card-border);
+    border-radius: var(--pcc-radius);
+    padding: 40px 38px 34px;
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    animation: pcc-pop-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+}
+
+@keyframes pcc-pop-in {
+    from { transform: scale(0.95) translateY(20px); opacity: 0; }
+    to   { transform: scale(1) translateY(0);       opacity: 1; }
+}
+
+/* ── Top tag / badge ── */
+.pcc-banner-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--pcc-tag-bg);
+    border: 1px solid var(--pcc-tag-border);
+    border-radius: 30px;
+    padding: 7px 18px;
+    margin-bottom: 22px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--pcc-teal);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.pcc-banner-tag svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Header */
+.pcc-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.pcc-banner-icon {
+    display: none;
+}
+
+.pcc-banner-header h3 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--pcc-heading);
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+}
+
+/* Body text */
+.pcc-banner-text p {
+    margin: 0 0 10px;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--pcc-text-muted);
+}
+
+.pcc-banner-text p:last-child {
+    margin-bottom: 0;
+}
+
+/* ── Buttons ── */
+.pcc-banner-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+}
+
+.pcc-btn {
+    padding: 15px 32px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+    font-family: inherit;
+    line-height: 1;
+    flex: 1;
+    min-width: 140px;
+}
+
+/* Accept = solid TEAL */
+.pcc-btn.pcc-btn-accept {
+    background: #3bb8a0 !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.pcc-btn.pcc-btn-accept:hover {
+    background: #2ea08a !important;
+    box-shadow: none !important;
+    transform: translateY(-1px);
+}
+
+/* Reject */
+.pcc-btn.pcc-btn-reject {
+    background: #000000 !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.pcc-btn.pcc-btn-reject:hover {
+    background: #1a1a1a !important;
+    box-shadow: none !important;
+    transform: translateY(-1px);
+}
+
+/* Preferences / Customize = full width */
+.pcc-btn.pcc-btn-preferences {
+    background: #e83e72 !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    flex: none;
+    width: 100%;
+}
+
+.pcc-btn.pcc-btn-preferences:hover {
+    background: #d12d60 !important;
+    box-shadow: none !important;
+    transform: translateY(-1px);
+}
+
+/* Save */
+.pcc-btn.pcc-btn-save {
+    background: #3bb8a0 !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.pcc-btn.pcc-btn-save:hover {
+    background: #2ea08a !important;
+    box-shadow: none !important;
+    transform: translateY(-1px);
+}
+
+/* Cancel */
+.pcc-btn.pcc-btn-cancel {
+    background: #000000 !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.pcc-btn.pcc-btn-cancel:hover {
+    background: #1a1a1a !important;
+    box-shadow: none !important;
+    transform: translateY(-1px);
+}
+
+.pcc-btn-icon {
+    opacity: 0.85;
+}
+
+/* ── Preferences panel ── */
+.pcc-preferences {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset: 0;
+    padding: 20px;
+}
+
+.pcc-preferences-content {
+    background: var(--pcc-bg);
+    border: 1px solid var(--pcc-card-border);
+    border-radius: var(--pcc-radius);
+    padding: 34px 36px;
+    max-width: 580px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+    animation: pcc-pop-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+}
+
+/* Scrollbar */
+.pcc-preferences-content::-webkit-scrollbar { width: 5px; }
+.pcc-preferences-content::-webkit-scrollbar-track { background: transparent; }
+.pcc-preferences-content::-webkit-scrollbar-thumb { background: rgba(59,184,160,0.25); border-radius: 3px; }
+
+.pcc-preferences-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+}
+
+.pcc-preferences-header h3 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--pcc-heading);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pcc-pref-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--pcc-teal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 3px 12px rgba(59,184,160,0.3);
+}
+
+.pcc-pref-icon svg {
+    width: 18px;
+    height: 18px;
+    color: #fff;
+}
+
+.pcc-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--pcc-text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    line-height: 1;
+}
+
+.pcc-close-btn:hover {
+    color: var(--pcc-pink);
+    border-color: var(--pcc-pink);
+    background: rgba(232,62,114,0.08);
+}
+
+.pcc-preferences-intro {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--pcc-text-muted);
+    margin: 0 0 22px;
+}
+
+/* ── Cookie categories ── */
+.pcc-cookie-category {
+    background: var(--pcc-card);
+    border: 1px solid var(--pcc-card-border);
+    border-radius: var(--pcc-radius-sm);
+    padding: 20px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+}
+
+.pcc-cookie-category:hover {
+    border-color: rgba(59,184,160,0.3);
+}
+
+.pcc-category-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.pcc-category-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pcc-category-info strong {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--pcc-heading);
+}
+
+.pcc-always-active {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--pcc-teal);
+    background: var(--pcc-badge-bg);
+    padding: 3px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+}
+
+.pcc-cookie-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--pcc-teal);
+    background: var(--pcc-badge-bg);
+    padding: 3px 12px;
+    border-radius: 20px;
+}
+
+.pcc-category-desc {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--pcc-text-muted);
+}
+
+/* ── Toggle switch ── */
+.pcc-toggle {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.pcc-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.pcc-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: 28px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.pcc-toggle-slider::before {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    left: 3px;
+    bottom: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.pcc-toggle input:checked + .pcc-toggle-slider {
+    background: var(--pcc-teal);
+}
+
+.pcc-toggle input:checked + .pcc-toggle-slider::before {
+    transform: translateX(22px);
+}
+
+.pcc-always-on {
+    background: var(--pcc-teal) !important;
+    cursor: not-allowed;
+}
+
+/* ── Expand / Collapse button ── */
+.pcc-expand-btn {
+    background: var(--pcc-teal);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.pcc-expand-btn:hover {
+    opacity: 0.85;
+}
+
+.pcc-expand-btn.pcc-expanded {
+    transform: rotate(180deg);
+}
+
+/* ── Cookie details table ── */
+.pcc-cookie-details {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--pcc-card-border);
+    animation: pcc-fade-table 0.3s ease;
+}
+
+@keyframes pcc-fade-table {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.pcc-cookie-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.pcc-cookie-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+.pcc-cookie-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--pcc-text-muted);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    border-bottom: 1px solid var(--pcc-card-border);
+}
+
+.pcc-cookie-table td {
+    padding: 8px 10px;
+    color: var(--pcc-text);
+    border-bottom: 1px solid rgba(56,130,200,0.08);
+    vertical-align: top;
+    line-height: 1.5;
+}
+
+.pcc-cookie-table tr:last-child td {
+    border-bottom: none;
+}
+
+.pcc-cookie-table code {
+    background: rgba(59,184,160,0.12);
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--pcc-teal);
+    font-weight: 600;
+    white-space: nowrap;
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+/* ── Preferences footer actions ── */
+.pcc-preferences-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+/* ── Reopen cookie settings button ── */
+.pcc-reopen-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 999998;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: var(--pcc-teal);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(59,184,160,0.4);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pcc-reopen-btn:hover {
+    transform: scale(1.12);
+    box-shadow: 0 8px 30px rgba(59,184,160,0.55);
+    background: var(--pcc-teal-dark);
+}
+
+.pcc-reopen-btn svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* ── Footer consent link ── */
+.pcc-footer-consent-bar {
+    text-align: center;
+    padding: 10px 16px 14px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.pcc-footer-consent-bar a.pcc-consent-link,
+a.pcc-consent-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.pcc-footer-consent-bar a.pcc-consent-link:hover,
+a.pcc-consent-link:hover {
+    opacity: 1;
+}
+
+.pcc-footer-consent-bar svg {
+    flex-shrink: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+    .pcc-overlay {
+        padding: 10px;
+        align-items: flex-end;
+    }
+
+    .pcc-banner {
+        padding: 28px 22px 24px;
+        border-radius: 16px;
+    }
+
+    .pcc-banner-header h3 {
+        font-size: 19px;
+    }
+
+    .pcc-banner-text p {
+        font-size: 13.5px;
+    }
+
+    .pcc-banner-actions {
+        flex-direction: column;
+    }
+
+    .pcc-btn {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+        padding: 15px 20px;
+    }
+
+    .pcc-preferences-content {
+        padding: 24px 20px;
+        border-radius: 16px;
+        max-height: 92vh;
+    }
+
+    .pcc-preferences-actions {
+        flex-direction: column;
+    }
+
+    .pcc-preferences-actions .pcc-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .pcc-cookie-category {
+        padding: 16px;
+    }
+}
