@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: Converta Cookie Banner
- * Plugin URI: https://converta.ch
+ * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 1.6.0
+ * Version: 1.6.1
  * Author: Converta
- * Author URI: https://converta.ch
+ * Author URI: https://converta.ro
  * License: GPL v2 or later
  * Text Domain: procab-cookie-consent
  */
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '1.6.0' );
+define( 'PCC_VERSION', '1.6.1' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
