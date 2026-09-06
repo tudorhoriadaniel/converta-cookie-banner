@@ -614,9 +614,31 @@ button#pcc-reopen-banner.pcc-reopen-btn svg {
     stroke: currentColor !important;
 }
 
-/* Links placed via shortcode or the pcc-consent-link class elsewhere */
+/* Links placed via shortcode or the pcc-consent-link class elsewhere,
+   or relocated by JS into the theme's own footer menu / copyright row.
+   They deliberately inherit the theme's link styling. */
 a.pcc-consent-link {
     cursor: pointer;
+}
+
+a.pcc-consent-link svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    vertical-align: -2px;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+li.pcc-consent-menu-item a.pcc-consent-link {
+    display: inline-flex;
+    align-items: center;
+}
+
+.pcc-consent-sep {
+    opacity: 0.6;
+    margin: 0 2px;
 }
 
 /* ── Responsive ── */

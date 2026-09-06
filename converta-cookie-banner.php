@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ch
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 1.5.1
+ * Version: 1.5.2
  * Author: Converta
  * Author URI: https://converta.ch
  * License: GPL v2 or later
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '1.5.1' );
+define( 'PCC_VERSION', '1.5.2' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -1398,7 +1398,7 @@ function pcc_admin_design_page() {
                     <input type="radio" name="pcc_reopen_method" value="footer_link" <?php checked( $reopen_method, 'footer_link' ); ?>>
                     <div class="pcc-method-content">
                         <strong>Footer Link</strong>
-                        <span>A discreet text link (e.g. &ldquo;Cookie Settings&rdquo;) shown at the very bottom of every page, translated automatically. Edit the text under <em>Translations</em>.</span>
+                        <span>A translated text link (e.g. &ldquo;Cookie Settings&rdquo;) inserted automatically into your theme&rsquo;s footer links &mdash; the footer menu or copyright row &mdash; inheriting the theme&rsquo;s styling. Falls back to a discreet bar at the very bottom if the theme has no footer links area. Edit the text under <em>Translations</em>.</span>
                     </div>
                 </label>
                 <label class="pcc-trans-method<?php echo 'both' === $reopen_method ? ' pcc-method-active' : ''; ?>">

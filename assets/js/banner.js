@@ -179,6 +179,70 @@
         }
     });
 
+    // ---- Smart footer link placement ----
+    // Try to move the consent link into the theme's own footer links area
+    // (footer menu, then copyright/site-info row) so it inherits the theme's
+    // styling. The standalone bar rendered by PHP stays only as a fallback.
+
+    function placeFooterLink() {
+        var bar = document.querySelector('.pcc-footer-consent-bar');
+        if (!bar) return;
+        var link = bar.querySelector('a.pcc-consent-link');
+        if (!link) return;
+
+        // 1) Footer menus (bottom-bar menus usually come last in the DOM,
+        //    so pick the LAST match to avoid widget-column menus).
+        var menuSelectors = [
+            'footer ul.footer-menu', 'footer .footer-menu ul',
+            '.site-footer ul.footer-menu',
+            'footer nav ul', '.site-footer nav ul', '#colophon nav ul',
+            'footer ul.menu', '.site-footer ul.menu', '#colophon ul.menu',
+            'footer ul.nav'
+        ];
+        for (var i = 0; i < menuSelectors.length; i++) {
+            var lists = document.querySelectorAll(menuSelectors[i]);
+            if (!lists.length) continue;
+            var menu = lists[lists.length - 1];
+            var li = document.createElement('li');
+            li.className = 'pcc-consent-menu-item';
+            // Borrow the class of a sibling item so theme menu styles apply
+            var sibling = menu.querySelector('li');
+            if (sibling && sibling.className) {
+                li.className = sibling.className
+                    .replace(/\bcurrent[-_\w]*\b/g, '')
+                    .replace(/\bactive\b/g, '')
+                    .trim() + ' pcc-consent-menu-item';
+            }
+            li.appendChild(link);
+            menu.appendChild(li);
+            bar.parentNode.removeChild(bar);
+            return;
+        }
+
+        // 2) Copyright / site-info rows — append inline with a separator.
+        var inlineSelectors = [
+            'footer .site-info', '.site-footer .site-info',
+            'footer .copyright', '.site-footer .copyright',
+            '.hestia-bottom-footer-content', 'footer .footer-bottom',
+            'footer .colophon-content'
+        ];
+        for (var j = 0; j < inlineSelectors.length; j++) {
+            var row = document.querySelector(inlineSelectors[j]);
+            if (!row) continue;
+            var sep = document.createElement('span');
+            sep.className = 'pcc-consent-sep';
+            sep.textContent = ' · ';
+            row.appendChild(sep);
+            row.appendChild(link);
+            bar.parentNode.removeChild(bar);
+            return;
+        }
+
+        // 3) No suitable spot found — keep the standalone bar as-is.
+    }
+
+    placeFooterLink();
+
     // ---- Expand/collapse cookie details ----
 
     document.querySelectorAll('.pcc-expand-btn').forEach(function (btn) {
