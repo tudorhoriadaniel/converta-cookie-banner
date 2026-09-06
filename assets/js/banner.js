@@ -190,6 +190,17 @@
         var link = bar.querySelector('a.pcc-consent-link');
         if (!link) return;
 
+        // If a consent link was already placed manually (menu item with the
+        // pcc-consent-link class, shortcode, widget), don't add another one —
+        // just remove the fallback bar.
+        var existing = document.querySelectorAll('.pcc-consent-link');
+        for (var k = 0; k < existing.length; k++) {
+            if (!bar.contains(existing[k])) {
+                bar.parentNode.removeChild(bar);
+                return;
+            }
+        }
+
         // 1) Footer menus (bottom-bar menus usually come last in the DOM,
         //    so pick the LAST match to avoid widget-column menus).
         var menuSelectors = [
