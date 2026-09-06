@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ch
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 1.5.4
+ * Version: 1.6.0
  * Author: Converta
  * Author URI: https://converta.ch
  * License: GPL v2 or later
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '1.5.4' );
+define( 'PCC_VERSION', '1.6.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -326,21 +326,29 @@ function pcc_get_translations() {
 /**
  * Detect current language based on configured method.
  */
-function pcc_detect_language() {
+/**
+ * Detect current language.
+ *
+ * $path_override / $lang_override let the AJAX banner endpoint pass the
+ * page's real path and <html lang> value, since admin-ajax.php requests
+ * don't carry them.
+ */
+function pcc_detect_language( $path_override = null, $lang_override = null ) {
     $trans  = pcc_get_translations();
     $method = $trans['detection_method'];
     $default = $trans['default_lang'];
 
     if ( $method === 'subfolder' ) {
-        $path = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
+        $uri = null !== $path_override ? $path_override : ( $_SERVER['REQUEST_URI'] ?? '' );
+        $path = trim( (string) parse_url( $uri, PHP_URL_PATH ), '/' );
         $segments = explode( '/', $path );
         $first = strtolower( $segments[0] ?? '' );
         if ( in_array( $first, array( 'en', 'fr', 'de', 'it', 'ro', 'es' ), true ) ) {
             return $first;
         }
     } elseif ( $method === 'html_lang' ) {
-        $locale = get_bloginfo( 'language' );
-        $short  = strtolower( substr( $locale, 0, 2 ) );
+        $locale = null !== $lang_override ? $lang_override : get_bloginfo( 'language' );
+        $short  = strtolower( substr( (string) $locale, 0, 2 ) );
         if ( in_array( $short, array( 'en', 'fr', 'de', 'it', 'ro', 'es' ), true ) ) {
             return $short;
         }
@@ -352,9 +360,9 @@ function pcc_detect_language() {
 /**
  * Get the translated strings for the current page.
  */
-function pcc_get_current_strings() {
+function pcc_get_current_strings( $path_override = null, $lang_override = null ) {
     $trans = pcc_get_translations();
-    $lang  = pcc_detect_language();
+    $lang  = pcc_detect_language( $path_override, $lang_override );
     return $trans['strings'][ $lang ] ?? $trans['strings']['en'];
 }
 
@@ -697,7 +705,24 @@ function pcc_enqueue_assets() {
     wp_add_inline_style( 'pcc-banner-style', $css );
 }
 
-add_action( 'wp_footer', 'pcc_render_banner' );
+// NOTE: The banner markup is intentionally NOT rendered into the page HTML
+// (SEO: its texts would appear as duplicate content on every page). It is
+// fetched at runtime by banner.js via the AJAX endpoint below and injected
+// into the DOM client-side.
+
+add_action( 'wp_ajax_pcc_get_banner', 'pcc_ajax_get_banner' );
+add_action( 'wp_ajax_nopriv_pcc_get_banner', 'pcc_ajax_get_banner' );
+
+function pcc_ajax_get_banner() {
+    $path = sanitize_text_field( wp_unslash( $_GET['path'] ?? '' ) );
+    $lang = sanitize_text_field( wp_unslash( $_GET['lang'] ?? '' ) );
+
+    ob_start();
+    pcc_render_banner( $path !== '' ? $path : null, $lang !== '' ? $lang : null );
+    $html = ob_get_clean();
+
+    wp_send_json_success( array( 'html' => $html ) );
+}
 
 /**
  * Helper: get cookie list grouped by category for the frontend.
@@ -775,15 +800,15 @@ function pcc_consent_link_shortcode( $atts ) {
     $atts = shortcode_atts( array( 'text' => '' ), $atts, 'pcc_consent_link' );
     $s    = pcc_get_current_strings();
     $text = '' !== $atts['text'] ? esc_html( $atts['text'] ) : ( $s['footer_link'] ?? 'Cookie Settings' );
-    return '<a href="#" class="pcc-consent-link" role="button">' . $text . '</a>';
+    return '<a href="#" class="pcc-consent-link" role="button" data-nosnippet>' . $text . '</a>';
 }
 
-function pcc_render_banner() {
+function pcc_render_banner( $path_override = null, $lang_override = null ) {
     $cookie_list = pcc_get_cookie_list();
-    $s = pcc_get_current_strings();
+    $s = pcc_get_current_strings( $path_override, $lang_override );
     $reopen_method = pcc_get_reopen_method();
     ?>
-<div id="pcc-cookie-overlay" class="pcc-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Cookie Consent">
+<div id="pcc-cookie-overlay" class="pcc-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Cookie Consent" data-nosnippet>
 
     <!-- Main Banner -->
     <div id="pcc-cookie-banner" class="pcc-banner">
@@ -910,7 +935,7 @@ function pcc_render_banner() {
 <?php endif; ?>
 
 <?php if ( 'footer_link' === $reopen_method || 'both' === $reopen_method ) : ?>
-<div class="pcc-footer-consent-bar">
+<div class="pcc-footer-consent-bar" data-nosnippet>
     <a href="#" class="pcc-consent-link" role="button">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01"/><path d="M16 15.5v.01"/><path d="M12 12v.01"/><path d="M11 17v.01"/><path d="M7 14v.01"/></svg>
         <?php echo $s['footer_link'] ?? 'Cookie Settings'; ?>

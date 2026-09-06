@@ -2,7 +2,7 @@
 
 GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2**, a built-in cookie scanner, consent statistics dashboard, full design customizer, and translations in 6 languages.
 
-**Version:** 1.5.4 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ch)
+**Version:** 1.6.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ch)
 
 ## Features
 
@@ -52,6 +52,11 @@ Verify with [Google Tag Assistant](https://tagassistant.google.com/): **Consent 
 - Uninstalling the plugin drops the log table and deletes all plugin options.
 
 ## Changelog
+
+### 1.6.0
+- **SEO: zero banner markup in the page HTML.** The banner's texts (headings, category descriptions, buttons) are no longer rendered server-side on every page — they were appearing as duplicate content in the source of every URL. The markup is now fetched via AJAX (`pcc_get_banner`) and injected client-side by banner.js. Language detection still works: the page's path and `<html lang>` are passed along with the request.
+- All banner containers carry `data-nosnippet`, so search engines never use banner text in snippets.
+- Consent Mode default/update in `<head>` and the dataLayer events are unchanged — GTM behavior is identical.
 
 ### 1.5.4
 - Universal footer detection for custom/hand-coded footers: when no WordPress footer menu or copyright row is found, the consent link is inserted right after the last link inside the page's `<footer>` element, inheriting its styling — works with any theme or custom-built page

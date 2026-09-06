@@ -1,8 +1,11 @@
 /**
  * Converta Cookie Banner - Banner Logic & Google Consent Mode v2 Update
  *
- * The default consent is fired inline in <head> by PHP (priority 1).
- * This script handles the UI, fires consent 'update', and logs to DB via AJAX.
+ * The consent default is fired inline in <head> by PHP (first script in the
+ * document). The banner MARKUP is intentionally absent from the page HTML
+ * (SEO: its texts would be duplicate content on every page) — this script
+ * fetches it via AJAX and injects it into the DOM at runtime, then wires up
+ * all UI behavior, fires consent 'update', and logs consent via AJAX.
  */
 (function () {
     'use strict';
@@ -84,6 +87,11 @@
         }
     }
 
+    // ---- UI state (elements exist only after AJAX injection) ----
+
+    var overlay = null, banner = null, prefsPanel = null, reopenBtn = null;
+    var bannerLoaded = false, bannerLoading = false, pendingShow = false;
+
     // ---- Save & Apply ----
 
     function saveConsent(action, consent) {
@@ -96,12 +104,12 @@
 
     // ---- UI Controls ----
 
-    var overlay      = document.getElementById('pcc-cookie-overlay');
-    var banner       = document.getElementById('pcc-cookie-banner');
-    var prefsPanel   = document.getElementById('pcc-preferences-panel');
-    var reopenBtn    = document.getElementById('pcc-reopen-banner');
-
     function showBanner() {
+        if (!bannerLoaded) {
+            pendingShow = true;
+            loadBanner();
+            return;
+        }
         overlay.style.display = 'flex';
         banner.style.display  = '';
         prefsPanel.style.display = 'none';
@@ -109,6 +117,7 @@
     }
 
     function hideBanner() {
+        if (!bannerLoaded) return;
         overlay.style.display = 'none';
         banner.style.display  = '';
         prefsPanel.style.display = 'none';
@@ -134,55 +143,10 @@
         banner.style.display     = '';
     }
 
-    // ---- Button handlers ----
-
-    document.getElementById('pcc-accept-all').addEventListener('click', function () {
-        saveConsent('accept_all', { necessary: true, statistics: true, marketing: true, timestamp: Date.now() });
-    });
-
-    document.getElementById('pcc-reject-all').addEventListener('click', function () {
-        saveConsent('reject_all', { necessary: true, statistics: false, marketing: false, timestamp: Date.now() });
-    });
-
-    document.getElementById('pcc-show-preferences').addEventListener('click', showPreferences);
-
-    document.getElementById('pcc-save-preferences').addEventListener('click', function () {
-        var stats = document.getElementById('pcc-statistics-toggle').checked;
-        var mkt   = document.getElementById('pcc-marketing-toggle').checked;
-        saveConsent('save_preferences', { necessary: true, statistics: stats, marketing: mkt, timestamp: Date.now() });
-    });
-
-    document.getElementById('pcc-cancel-preferences').addEventListener('click', hidePreferences);
-    document.getElementById('pcc-close-preferences').addEventListener('click', hidePreferences);
-
-    // Accept All from preferences panel
-    var acceptAllPrefs = document.getElementById('pcc-accept-all-prefs');
-    if (acceptAllPrefs) {
-        acceptAllPrefs.addEventListener('click', function () {
-            saveConsent('accept_all', { necessary: true, statistics: true, marketing: true, timestamp: Date.now() });
-        });
-    }
-
-    if (reopenBtn) {
-        reopenBtn.addEventListener('click', function () {
-            reopenBtn.style.display = 'none';
-            showBanner();
-        });
-    }
-
-    // Footer link / shortcode / menu links with class .pcc-consent-link
-    document.addEventListener('click', function (e) {
-        var link = e.target.closest ? e.target.closest('.pcc-consent-link') : null;
-        if (link) {
-            e.preventDefault();
-            showBanner();
-        }
-    });
-
     // ---- Smart footer link placement ----
     // Try to move the consent link into the theme's own footer links area
-    // (footer menu, then copyright/site-info row) so it inherits the theme's
-    // styling. The standalone bar rendered by PHP stays only as a fallback.
+    // so it inherits the theme's styling. The standalone bar stays only as
+    // a last-resort fallback.
 
     function placeFooterLink() {
         var bar = document.querySelector('.pcc-footer-consent-bar');
@@ -270,34 +234,139 @@
         // 4) No suitable spot found — keep the standalone bar as-is.
     }
 
-    placeFooterLink();
+    // ---- Wire up the injected markup ----
 
-    // ---- Expand/collapse cookie details ----
+    function initUI() {
+        overlay    = document.getElementById('pcc-cookie-overlay');
+        banner     = document.getElementById('pcc-cookie-banner');
+        prefsPanel = document.getElementById('pcc-preferences-panel');
+        reopenBtn  = document.getElementById('pcc-reopen-banner');
 
-    document.querySelectorAll('.pcc-expand-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var targetId = this.dataset.target;
-            var target = document.getElementById(targetId);
-            if (!target) return;
+        if (!overlay || !banner || !prefsPanel) return;
 
-            var isOpen = target.style.display !== 'none';
-            target.style.display = isOpen ? 'none' : 'block';
-            this.classList.toggle('pcc-expanded', !isOpen);
+        var acceptAll = document.getElementById('pcc-accept-all');
+        if (acceptAll) acceptAll.addEventListener('click', function () {
+            saveConsent('accept_all', { necessary: true, statistics: true, marketing: true, timestamp: Date.now() });
         });
-    });
+
+        var rejectAll = document.getElementById('pcc-reject-all');
+        if (rejectAll) rejectAll.addEventListener('click', function () {
+            saveConsent('reject_all', { necessary: true, statistics: false, marketing: false, timestamp: Date.now() });
+        });
+
+        var showPrefs = document.getElementById('pcc-show-preferences');
+        if (showPrefs) showPrefs.addEventListener('click', showPreferences);
+
+        var savePrefs = document.getElementById('pcc-save-preferences');
+        if (savePrefs) savePrefs.addEventListener('click', function () {
+            var stats = document.getElementById('pcc-statistics-toggle').checked;
+            var mkt   = document.getElementById('pcc-marketing-toggle').checked;
+            saveConsent('save_preferences', { necessary: true, statistics: stats, marketing: mkt, timestamp: Date.now() });
+        });
+
+        var cancelPrefs = document.getElementById('pcc-cancel-preferences');
+        if (cancelPrefs) cancelPrefs.addEventListener('click', hidePreferences);
+
+        var closePrefs = document.getElementById('pcc-close-preferences');
+        if (closePrefs) closePrefs.addEventListener('click', hidePreferences);
+
+        var acceptAllPrefs = document.getElementById('pcc-accept-all-prefs');
+        if (acceptAllPrefs) {
+            acceptAllPrefs.addEventListener('click', function () {
+                saveConsent('accept_all', { necessary: true, statistics: true, marketing: true, timestamp: Date.now() });
+            });
+        }
+
+        if (reopenBtn) {
+            reopenBtn.addEventListener('click', function () {
+                reopenBtn.style.display = 'none';
+                showBanner();
+            });
+        }
+
+        // Expand/collapse cookie details
+        document.querySelectorAll('.pcc-expand-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var targetId = this.dataset.target;
+                var target = document.getElementById(targetId);
+                if (!target) return;
+
+                var isOpen = target.style.display !== 'none';
+                target.style.display = isOpen ? 'none' : 'block';
+                this.classList.toggle('pcc-expanded', !isOpen);
+            });
+        });
+
+        placeFooterLink();
+
+        var existing = getCookie(COOKIE_NAME);
+        if (existing && existing.timestamp) {
+            if (reopenBtn) reopenBtn.style.display = 'flex';
+            if (pendingShow) { pendingShow = false; showBanner(); }
+        } else {
+            pendingShow = false;
+            showBanner();
+        }
+    }
+
+    // ---- Fetch the banner markup and inject it ----
+
+    function loadBanner() {
+        if (bannerLoaded || bannerLoading) return;
+        bannerLoading = true;
+
+        var lang = (document.documentElement.getAttribute('lang') || '').substring(0, 2).toLowerCase();
+        var url = AJAX_URL +
+            '?action=pcc_get_banner' +
+            '&path=' + encodeURIComponent(window.location.pathname) +
+            '&lang=' + encodeURIComponent(lang);
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (!res || !res.success || !res.data || !res.data.html) {
+                    bannerLoading = false;
+                    return;
+                }
+                var wrap = document.createElement('div');
+                wrap.innerHTML = res.data.html;
+                while (wrap.firstChild) {
+                    document.body.appendChild(wrap.firstChild);
+                }
+                bannerLoaded  = true;
+                bannerLoading = false;
+                initUI();
+            })
+            .catch(function () { bannerLoading = false; });
+    }
 
     // ---- Init ----
 
     // Necessary cookies are always active — fire on every page load
     window.dataLayer.push({ 'event': 'cookie_necessary' });
 
-    var existing = getCookie(COOKIE_NAME);
-    if (existing && existing.timestamp) {
-        // Returning visitor — re-fire consent events based on stored preferences
-        pushConsentEvents(existing);
-        if (reopenBtn) reopenBtn.style.display = 'flex';
+    // Returning visitor — re-fire consent events immediately (no DOM needed)
+    var existing0 = getCookie(COOKIE_NAME);
+    if (existing0 && existing0.timestamp) {
+        pushConsentEvents(existing0);
+    }
+
+    // Consent links placed manually (menu items, shortcode) work even
+    // before the banner markup is loaded.
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest ? e.target.closest('.pcc-consent-link') : null;
+        if (link) {
+            e.preventDefault();
+            showBanner();
+        }
+    });
+
+    // Always load the banner container: new visitors need the banner itself,
+    // returning visitors need the reopen icon / footer link.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadBanner);
     } else {
-        showBanner();
+        loadBanner();
     }
 
 })();
