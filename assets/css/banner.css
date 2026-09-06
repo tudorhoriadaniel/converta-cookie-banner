@@ -512,65 +512,111 @@
     flex-wrap: wrap;
 }
 
-/* ── Reopen cookie settings button ── */
-.pcc-reopen-btn {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    z-index: 999998;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    border: none;
+/* ── Reopen cookie settings button ──
+   Heavily hardened against theme button styles (padding, min-width,
+   border-radius, gradients) that squash it into an ellipse. */
+button#pcc-reopen-banner.pcc-reopen-btn {
+    position: fixed !important;
+    bottom: 20px !important;
+    left: 20px !important;
+    top: auto !important;
+    right: auto !important;
+    z-index: 999998 !important;
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    max-width: 54px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 50% !important;
+    border: none !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+    font-size: 0 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    overflow: hidden !important;
     background: var(--pcc-teal);
+    background-image: none !important;
     color: #fff;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 20px rgba(59,184,160,0.4);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35) !important;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
 }
 
-.pcc-reopen-btn:hover {
-    transform: scale(1.12);
-    box-shadow: 0 8px 30px rgba(59,184,160,0.55);
-    background: var(--pcc-teal-dark);
+button#pcc-reopen-banner.pcc-reopen-btn:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45) !important;
 }
 
-.pcc-reopen-btn svg {
-    width: 22px;
-    height: 22px;
+button#pcc-reopen-banner.pcc-reopen-btn::before,
+button#pcc-reopen-banner.pcc-reopen-btn::after {
+    display: none !important;
+    content: none !important;
 }
 
-/* ── Footer consent link ── */
+button#pcc-reopen-banner.pcc-reopen-btn svg {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-width: 28px !important;
+    max-height: 28px !important;
+    display: block !important;
+    margin: 0 !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    flex: 0 0 auto !important;
+}
+
+/* ── Footer consent link ──
+   Solid background so it stays legible over theme background images
+   and doesn't expose a strip of the body background below the footer. */
 .pcc-footer-consent-bar {
-    text-align: center;
-    padding: 10px 16px 14px;
-    font-size: 13px;
-    line-height: 1.4;
+    position: relative;
+    z-index: 99990;
+    background: var(--pcc-bg, #0b1426) !important;
+    text-align: center !important;
+    padding: 12px 16px !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.pcc-footer-consent-bar a.pcc-consent-link,
-a.pcc-consent-link {
-    display: inline-flex;
+.pcc-footer-consent-bar a.pcc-consent-link {
+    display: inline-flex !important;
     align-items: center;
     gap: 6px;
-    color: inherit;
-    text-decoration: underline;
+    color: var(--pcc-text, #7b8da6) !important;
+    text-decoration: underline !important;
     text-underline-offset: 2px;
     cursor: pointer;
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
+    opacity: 0.9;
+    transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.pcc-footer-consent-bar a.pcc-consent-link:hover,
-a.pcc-consent-link:hover {
+.pcc-footer-consent-bar a.pcc-consent-link:hover {
     opacity: 1;
+    color: var(--pcc-teal, #3bb8a0) !important;
 }
 
 .pcc-footer-consent-bar svg {
     flex-shrink: 0;
+    width: 15px !important;
+    height: 15px !important;
+    fill: none !important;
+    stroke: currentColor !important;
+}
+
+/* Links placed via shortcode or the pcc-consent-link class elsewhere */
+a.pcc-consent-link {
+    cursor: pointer;
 }
 
 /* ── Responsive ── */

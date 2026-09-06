@@ -2,7 +2,7 @@
 
 GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2**, a built-in cookie scanner, consent statistics dashboard, full design customizer, and translations in 6 languages.
 
-**Version:** 1.5.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ch)
+**Version:** 1.5.1 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ch)
 
 ## Features
 
@@ -52,6 +52,10 @@ Verify with [Google Tag Assistant](https://tagassistant.google.com/): **Consent 
 - Uninstalling the plugin drops the log table and deletes all plugin options.
 
 ## Changelog
+
+### 1.5.1
+- Floating icon now shows a **cookie symbol** and is hardened against theme button styles (`!important` on size, padding, and `border-radius: 50%`), so it stays perfectly round in any theme
+- Footer consent link now has a solid background bar (banner background color), so it is legible over theme background images and no longer exposes a strip of the body background below the footer
 
 ### 1.5.0
 - New **Reopen Consent** option (Banner Design page): floating icon, translated footer link, or both
