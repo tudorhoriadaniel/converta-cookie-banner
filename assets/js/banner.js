@@ -249,7 +249,25 @@
             return;
         }
 
-        // 3) No suitable spot found — keep the standalone bar as-is.
+        // 3) Universal fallback for custom/hand-coded footers: insert right
+        //    after the LAST link inside the page's last <footer> element, so
+        //    it sits with the theme's own footer links and inherits their
+        //    styling (works with flex/gap rows, plain divs, anything).
+        var footers = document.querySelectorAll('footer');
+        if (footers.length) {
+            var foot = footers[footers.length - 1];
+            var anchors = foot.querySelectorAll('a[href]');
+            if (anchors.length) {
+                var lastA = anchors[anchors.length - 1];
+                if (lastA.parentNode && !bar.contains(lastA)) {
+                    lastA.parentNode.insertBefore(link, lastA.nextSibling);
+                    bar.parentNode.removeChild(bar);
+                    return;
+                }
+            }
+        }
+
+        // 4) No suitable spot found — keep the standalone bar as-is.
     }
 
     placeFooterLink();
