@@ -2,7 +2,7 @@
 
 GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2**, a built-in cookie scanner, consent statistics dashboard, full design customizer, and translations in 6 languages.
 
-**Version:** 1.8.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
+**Version:** 1.9.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
 
 ## Features
 
@@ -30,6 +30,10 @@ GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2*
    - **Banner Design** — colors, sizes, and the *Reopen Consent* method
    - **Translations** — language detection and all banner texts
 
+### Updates — no more zip uploads
+
+Once installed, the plugin **updates itself directly from this GitHub repository** (main branch) using WordPress's native update mechanism: when a newer version is pushed here, a standard "Update available" notice appears on the site's Plugins page. While the repository is private, paste a GitHub personal access token (read access to this repo) in **Banner Design → Plugin Updates from GitHub**; a public repository needs no token.
+
 ## Google Tag Manager setup
 
 The plugin handles the consent side; in GTM you can use these dataLayer events as triggers for tags that must wait for consent:
@@ -52,6 +56,9 @@ Verify with [Google Tag Assistant](https://tagassistant.google.com/): **Consent 
 - Uninstalling the plugin drops the log table and deletes all plugin options.
 
 ## Changelog
+
+### 1.9.0
+- **Self-updates from GitHub**: the plugin now uses WordPress's native `Update URI` mechanism to check this repository's main branch for new versions and offers them as normal one-click updates on the Plugins page — no manual zip uploads. New "Plugin Updates from GitHub" section on the Banner Design page shows the update status and accepts an optional GitHub token for private-repo access.
 
 ### 1.8.0
 - New **Google Tag Manager blocking mode** option (Banner Design page):

@@ -3,22 +3,24 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 1.8.0
+ * Version: 1.9.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
  * Text Domain: procab-cookie-consent
+ * Update URI: https://github.com/tudorhoriadaniel/converta-cookie-banner
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '1.8.0' );
+define( 'PCC_VERSION', '1.9.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
 define( 'PCC_COOKIE_EXPIRY', 365 );
+define( 'PCC_GITHUB_REPO', 'tudorhoriadaniel/converta-cookie-banner' );
 
 require_once PCC_PLUGIN_DIR . 'includes/class-cookie-scanner.php';
 
@@ -790,6 +792,139 @@ function pcc_ajax_get_banner() {
     wp_send_json_success( array( 'html' => $html ) );
 }
 
+// =========================================================================
+//  UPDATES FROM GITHUB: native WordPress updates, no manual zip uploads.
+//  Uses the core `Update URI` mechanism (WP 5.8+). Works out of the box
+//  when the repo is public; for a private repo, paste a GitHub personal
+//  access token (repo read scope) in the Banner Design page.
+// =========================================================================
+
+/**
+ * Latest version on GitHub's main branch (cached 6 hours).
+ */
+function pcc_get_remote_version() {
+    $cached = get_site_transient( 'pcc_github_version' );
+    if ( $cached ) {
+        return $cached;
+    }
+
+    $resp = wp_remote_get(
+        'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/contents/converta-cookie-banner.php?ref=main',
+        array(
+            'timeout' => 10,
+            'headers' => array( 'Accept' => 'application/vnd.github.raw+json' ),
+        )
+    );
+
+    if ( is_wp_error( $resp ) || 200 !== wp_remote_retrieve_response_code( $resp ) ) {
+        return false;
+    }
+
+    $body = wp_remote_retrieve_body( $resp );
+    if ( preg_match( '/^\s*\*\s*Version:\s*([0-9][0-9a-z.\-]*)/mi', $body, $m ) ) {
+        set_site_transient( 'pcc_github_version', $m[1], 6 * HOUR_IN_SECONDS );
+        return $m[1];
+    }
+
+    return false;
+}
+
+// Send the GitHub token (if configured) with requests to this repo only.
+add_filter( 'http_request_args', 'pcc_github_request_args', 10, 2 );
+
+function pcc_github_request_args( $args, $url ) {
+    $token = get_option( 'pcc_github_token', '' );
+    if ( ! $token ) {
+        return $args;
+    }
+    if ( false !== strpos( $url, 'github.com/' . PCC_GITHUB_REPO )
+        || false !== strpos( $url, 'api.github.com/repos/' . PCC_GITHUB_REPO )
+        || false !== strpos( $url, 'raw.githubusercontent.com/' . PCC_GITHUB_REPO ) ) {
+        if ( ! isset( $args['headers'] ) || ! is_array( $args['headers'] ) ) {
+            $args['headers'] = array();
+        }
+        $args['headers']['Authorization'] = 'token ' . $token;
+    }
+    return $args;
+}
+
+// Core calls this for every plugin whose Update URI host is github.com.
+add_filter( 'update_plugins_github.com', 'pcc_github_update_info', 10, 3 );
+
+function pcc_github_update_info( $update, $plugin_data, $plugin_file ) {
+    if ( plugin_basename( __FILE__ ) !== $plugin_file ) {
+        return $update;
+    }
+
+    $remote = pcc_get_remote_version();
+    if ( ! $remote ) {
+        return $update;
+    }
+
+    // With a token, the API zipball follows an authenticated redirect;
+    // without one (public repo) the plain archive URL is enough.
+    $package = get_option( 'pcc_github_token', '' )
+        ? 'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/zipball/main'
+        : 'https://github.com/' . PCC_GITHUB_REPO . '/archive/refs/heads/main.zip';
+
+    return array(
+        'id'      => 'https://github.com/' . PCC_GITHUB_REPO,
+        'slug'    => dirname( plugin_basename( __FILE__ ) ),
+        'plugin'  => $plugin_file,
+        'version' => $remote,
+        'url'     => 'https://github.com/' . PCC_GITHUB_REPO,
+        'package' => $package,
+    );
+}
+
+// GitHub zips extract to folders like "converta-cookie-banner-main" or
+// "tudorhoriadaniel-converta-cookie-banner-<sha>"; rename the extracted
+// folder to the currently installed plugin folder so the plugin stays
+// activated and its path never changes.
+add_filter( 'upgrader_source_selection', 'pcc_normalize_github_source', 10, 4 );
+
+function pcc_normalize_github_source( $source, $remote_source, $upgrader, $hook_extra ) {
+    if ( empty( $hook_extra['plugin'] ) || plugin_basename( __FILE__ ) !== $hook_extra['plugin'] ) {
+        return $source;
+    }
+    global $wp_filesystem;
+    $desired = trailingslashit( $remote_source ) . dirname( plugin_basename( __FILE__ ) );
+    if ( untrailingslashit( $source ) === $desired ) {
+        return $source;
+    }
+    if ( $wp_filesystem && $wp_filesystem->move( untrailingslashit( $source ), $desired ) ) {
+        return trailingslashit( $desired );
+    }
+    return $source;
+}
+
+// After this plugin updates, forget the cached remote version.
+add_action( 'upgrader_process_complete', 'pcc_flush_update_cache', 10, 2 );
+
+function pcc_flush_update_cache( $upgrader, $hook_extra ) {
+    if ( isset( $hook_extra['type'] ) && 'plugin' === $hook_extra['type'] ) {
+        delete_site_transient( 'pcc_github_version' );
+    }
+}
+
+// AJAX: save the GitHub token (admins only). An empty value removes it.
+add_action( 'wp_ajax_pcc_save_gh_token', 'pcc_ajax_save_gh_token' );
+
+function pcc_ajax_save_gh_token() {
+    check_ajax_referer( 'pcc_design_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( 'Unauthorized' );
+    }
+    $token = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
+    if ( '' === $token ) {
+        delete_option( 'pcc_github_token' );
+    } else {
+        update_option( 'pcc_github_token', $token, false );
+    }
+    delete_site_transient( 'pcc_github_version' );
+    wp_send_json_success();
+}
+
 /**
  * Helper: get cookie list grouped by category for the frontend.
  */
@@ -1531,6 +1666,49 @@ function pcc_admin_design_page() {
             </div>
         </div>
 
+        <!-- GitHub updates -->
+        <?php
+        $gh_token      = get_option( 'pcc_github_token', '' );
+        $remote_ver    = pcc_get_remote_version();
+        $update_status = $remote_ver
+            ? ( version_compare( $remote_ver, PCC_VERSION, '>' )
+                ? '<span style="color:#b45309;">Update available: v' . esc_html( $remote_ver ) . ' (installed: v' . esc_html( PCC_VERSION ) . ') &mdash; install it from the <a href="' . esc_url( admin_url( 'plugins.php' ) ) . '">Plugins page</a>.</span>'
+                : '<span style="color:#15803d;">Up to date (v' . esc_html( PCC_VERSION ) . ').</span>' )
+            : '<span style="color:#b91c1c;">GitHub not reachable &mdash; the repository is private. Paste a token below, or make the repo public.</span>';
+        ?>
+        <div class="pcc-design-section" style="margin-bottom:20px;">
+            <h3>Plugin Updates from GitHub</h3>
+            <p style="margin-top:0;">This plugin updates itself from <a href="https://github.com/<?php echo esc_attr( PCC_GITHUB_REPO ); ?>" target="_blank" rel="noopener">github.com/<?php echo esc_html( PCC_GITHUB_REPO ); ?></a> (main branch). When a new version is pushed, a normal WordPress update notice appears on the Plugins page &mdash; no manual zip uploads.</p>
+            <p><strong>Status:</strong> <?php echo $update_status; // phpcs:ignore WordPress.Security.EscapeOutput ?></p>
+            <p style="margin-bottom:6px;"><strong>GitHub access token</strong> (only needed while the repository is private; create one at GitHub &rarr; Settings &rarr; Developer settings &rarr; Personal access tokens, with read access to this repo):</p>
+            <div style="display:flex;gap:8px;align-items:center;max-width:560px;">
+                <input type="password" id="pcc-gh-token" class="regular-text" style="flex:1;" placeholder="<?php echo $gh_token ? 'Token saved — enter a new one to replace, save empty to remove' : 'ghp_… or github_pat_…'; ?>" autocomplete="off">
+                <button type="button" class="button" id="pcc-save-gh-token">Save Token</button>
+                <span id="pcc-gh-token-msg"></span>
+            </div>
+            <script>
+            (function(){
+                var btn = document.getElementById('pcc-save-gh-token');
+                if (!btn) return;
+                btn.addEventListener('click', function(){
+                    var fd = new FormData();
+                    fd.append('action', 'pcc_save_gh_token');
+                    fd.append('nonce', '<?php echo esc_js( wp_create_nonce( 'pcc_design_nonce' ) ); ?>');
+                    fd.append('token', document.getElementById('pcc-gh-token').value);
+                    btn.disabled = true;
+                    fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {method:'POST', body:fd})
+                        .then(function(r){ return r.json(); })
+                        .then(function(res){
+                            document.getElementById('pcc-gh-token-msg').textContent = res.success ? 'Saved — reloading…' : 'Error saving';
+                            if (res.success) { setTimeout(function(){ window.location.reload(); }, 800); }
+                            btn.disabled = false;
+                        })
+                        .catch(function(){ btn.disabled = false; });
+                });
+            })();
+            </script>
+        </div>
+
         <div class="pcc-design-layout">
             <!-- Color controls -->
             <div class="pcc-design-controls">
@@ -1618,4 +1796,6 @@ function pcc_uninstall() {
     delete_option( 'pcc_scan_results' );
     delete_option( 'pcc_design' );
     delete_option( 'pcc_translations' );
+    delete_option( 'pcc_github_token' );
+    delete_site_transient( 'pcc_github_version' );
 }
