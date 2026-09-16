@@ -149,15 +149,15 @@
     // a last-resort fallback.
 
     function placeFooterLink() {
-        var bar = document.querySelector('.pcc-footer-consent-bar');
+        var bar = document.querySelector('.pcc-footer-bar');
         if (!bar) return;
-        var link = bar.querySelector('a.pcc-consent-link');
+        var link = bar.querySelector('a.pcc-plink');
         if (!link) return;
 
         // If a consent link was already placed manually (menu item with the
-        // pcc-consent-link class, shortcode, widget), don't add another one —
+        // pcc-plink class, shortcode, widget), don't add another one —
         // just remove the fallback bar.
-        var existing = document.querySelectorAll('.pcc-consent-link');
+        var existing = document.querySelectorAll('.pcc-plink');
         for (var k = 0; k < existing.length; k++) {
             if (!bar.contains(existing[k])) {
                 bar.parentNode.removeChild(bar);
@@ -179,14 +179,14 @@
             if (!lists.length) continue;
             var menu = lists[lists.length - 1];
             var li = document.createElement('li');
-            li.className = 'pcc-consent-menu-item';
+            li.className = 'pcc-menu-item';
             // Borrow the class of a sibling item so theme menu styles apply
             var sibling = menu.querySelector('li');
             if (sibling && sibling.className) {
                 li.className = sibling.className
                     .replace(/\bcurrent[-_\w]*\b/g, '')
                     .replace(/\bactive\b/g, '')
-                    .trim() + ' pcc-consent-menu-item';
+                    .trim() + ' pcc-menu-item';
             }
             li.appendChild(link);
             menu.appendChild(li);
@@ -205,7 +205,7 @@
             var row = document.querySelector(inlineSelectors[j]);
             if (!row) continue;
             var sep = document.createElement('span');
-            sep.className = 'pcc-consent-sep';
+            sep.className = 'pcc-sep';
             sep.textContent = ' · ';
             row.appendChild(sep);
             row.appendChild(link);
@@ -237,10 +237,10 @@
     // ---- Wire up the injected markup ----
 
     function initUI() {
-        overlay    = document.getElementById('pcc-cookie-overlay');
-        banner     = document.getElementById('pcc-cookie-banner');
+        overlay    = document.getElementById('pcc-ui-overlay');
+        banner     = document.getElementById('pcc-ui-card');
         prefsPanel = document.getElementById('pcc-preferences-panel');
-        reopenBtn  = document.getElementById('pcc-reopen-banner');
+        reopenBtn  = document.getElementById('pcc-reopen');
 
         if (!overlay || !banner || !prefsPanel) return;
 
@@ -317,7 +317,7 @@
 
         var lang = (document.documentElement.getAttribute('lang') || '').substring(0, 2).toLowerCase();
         var url = AJAX_URL +
-            '?action=pcc_get_banner' +
+            '?action=pcc_load_ui' +
             '&path=' + encodeURIComponent(window.location.pathname) +
             '&lang=' + encodeURIComponent(lang);
 
@@ -352,21 +352,37 @@
     }
 
     // Consent links placed manually (menu items, shortcode) work even
-    // before the banner markup is loaded.
+    // before the banner markup is loaded. The legacy class name from
+    // pre-1.7.0 setups is also supported.
     document.addEventListener('click', function (e) {
-        var link = e.target.closest ? e.target.closest('.pcc-consent-link') : null;
+        var link = e.target.closest ? e.target.closest('.pcc-plink, .pcc-consent-link') : null;
         if (link) {
             e.preventDefault();
             showBanner();
         }
     });
 
+    // Rename legacy manually-placed link classes to the neutral one, so
+    // ad-block cosmetic filters (which hide [class*="consent"] patterns)
+    // don't hide the user's own menu items.
+    function migrateLegacyLinks() {
+        document.querySelectorAll('.pcc-consent-link').forEach(function (el) {
+            el.classList.remove('pcc-consent-link');
+            el.classList.add('pcc-plink');
+        });
+    }
+
+    function boot() {
+        migrateLegacyLinks();
+        loadBanner();
+    }
+
     // Always load the banner container: new visitors need the banner itself,
     // returning visitors need the reopen icon / footer link.
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadBanner);
+        document.addEventListener('DOMContentLoaded', boot);
     } else {
-        loadBanner();
+        boot();
     }
 
 })();

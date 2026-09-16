@@ -38,7 +38,7 @@
 }
 
 /* ── Main banner ── */
-.pcc-banner {
+.pcc-card {
     background: var(--pcc-bg);
     border: 1px solid var(--pcc-card-border);
     border-radius: var(--pcc-radius);
@@ -56,7 +56,7 @@
 }
 
 /* ── Top tag / badge ── */
-.pcc-banner-tag {
+.pcc-card-tag {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -72,25 +72,25 @@
     letter-spacing: 1px;
 }
 
-.pcc-banner-tag svg {
+.pcc-card-tag svg {
     width: 16px;
     height: 16px;
     flex-shrink: 0;
 }
 
 /* Header */
-.pcc-banner-header {
+.pcc-card-header {
     display: flex;
     align-items: center;
     gap: 14px;
     margin-bottom: 14px;
 }
 
-.pcc-banner-icon {
+.pcc-card-icon {
     display: none;
 }
 
-.pcc-banner-header h3 {
+.pcc-card-header h3 {
     margin: 0;
     font-size: 24px;
     font-weight: 800;
@@ -100,19 +100,19 @@
 }
 
 /* Body text */
-.pcc-banner-text p {
+.pcc-card-text p {
     margin: 0 0 10px;
     font-size: 15px;
     line-height: 1.7;
     color: var(--pcc-text-muted);
 }
 
-.pcc-banner-text p:last-child {
+.pcc-card-text p:last-child {
     margin-bottom: 0;
 }
 
 /* ── Buttons ── */
-.pcc-banner-actions {
+.pcc-card-actions {
     display: flex;
     gap: 12px;
     margin-top: 28px;
@@ -311,7 +311,7 @@
 }
 
 /* ── Cookie categories ── */
-.pcc-cookie-category {
+.pcc-ui-category {
     background: var(--pcc-card);
     border: 1px solid var(--pcc-card-border);
     border-radius: var(--pcc-radius-sm);
@@ -320,7 +320,7 @@
     transition: all 0.2s;
 }
 
-.pcc-cookie-category:hover {
+.pcc-ui-category:hover {
     border-color: rgba(59,184,160,0.3);
 }
 
@@ -354,7 +354,7 @@
     letter-spacing: 0.3px;
 }
 
-.pcc-cookie-count {
+.pcc-ui-count {
     font-size: 11px;
     font-weight: 600;
     color: var(--pcc-teal);
@@ -447,7 +447,7 @@
 }
 
 /* ── Cookie details table ── */
-.pcc-cookie-details {
+.pcc-ui-details {
     margin-top: 14px;
     padding-top: 14px;
     border-top: 1px solid var(--pcc-card-border);
@@ -459,18 +459,18 @@
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.pcc-cookie-table-wrap {
+.pcc-ui-table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-.pcc-cookie-table {
+.pcc-ui-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12.5px;
 }
 
-.pcc-cookie-table th {
+.pcc-ui-table th {
     text-align: left;
     padding: 8px 10px;
     color: var(--pcc-text-muted);
@@ -481,7 +481,7 @@
     border-bottom: 1px solid var(--pcc-card-border);
 }
 
-.pcc-cookie-table td {
+.pcc-ui-table td {
     padding: 8px 10px;
     color: var(--pcc-text);
     border-bottom: 1px solid rgba(56,130,200,0.08);
@@ -489,11 +489,11 @@
     line-height: 1.5;
 }
 
-.pcc-cookie-table tr:last-child td {
+.pcc-ui-table tr:last-child td {
     border-bottom: none;
 }
 
-.pcc-cookie-table code {
+.pcc-ui-table code {
     background: rgba(59,184,160,0.12);
     padding: 2px 8px;
     border-radius: 5px;
@@ -515,7 +515,7 @@
 /* ── Reopen cookie settings button ──
    Heavily hardened against theme button styles (padding, min-width,
    border-radius, gradients) that squash it into an ellipse. */
-button#pcc-reopen-banner.pcc-reopen-btn {
+button#pcc-reopen.pcc-reopen-btn {
     position: fixed !important;
     bottom: 20px !important;
     left: 20px !important;
@@ -548,18 +548,18 @@ button#pcc-reopen-banner.pcc-reopen-btn {
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
 }
 
-button#pcc-reopen-banner.pcc-reopen-btn:hover {
+button#pcc-reopen.pcc-reopen-btn:hover {
     transform: scale(1.1) !important;
     box-shadow: 0 8px 30px rgba(0,0,0,0.45) !important;
 }
 
-button#pcc-reopen-banner.pcc-reopen-btn::before,
-button#pcc-reopen-banner.pcc-reopen-btn::after {
+button#pcc-reopen.pcc-reopen-btn::before,
+button#pcc-reopen.pcc-reopen-btn::after {
     display: none !important;
     content: none !important;
 }
 
-button#pcc-reopen-banner.pcc-reopen-btn svg {
+button#pcc-reopen.pcc-reopen-btn svg {
     width: 28px !important;
     height: 28px !important;
     min-width: 28px !important;
@@ -576,7 +576,7 @@ button#pcc-reopen-banner.pcc-reopen-btn svg {
 /* ── Footer consent link ──
    Solid background so it stays legible over theme background images
    and doesn't expose a strip of the body background below the footer. */
-.pcc-footer-consent-bar {
+.pcc-footer-bar {
     position: relative;
     z-index: 99990;
     background: var(--pcc-bg, #0b1426) !important;
@@ -589,7 +589,7 @@ button#pcc-reopen-banner.pcc-reopen-btn svg {
     box-sizing: border-box;
 }
 
-.pcc-footer-consent-bar a.pcc-consent-link {
+.pcc-footer-bar a.pcc-plink {
     display: inline-flex !important;
     align-items: center;
     gap: 6px;
@@ -601,12 +601,12 @@ button#pcc-reopen-banner.pcc-reopen-btn svg {
     transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.pcc-footer-consent-bar a.pcc-consent-link:hover {
+.pcc-footer-bar a.pcc-plink:hover {
     opacity: 1;
     color: var(--pcc-teal, #3bb8a0) !important;
 }
 
-.pcc-footer-consent-bar svg {
+.pcc-footer-bar svg {
     flex-shrink: 0;
     width: 15px !important;
     height: 15px !important;
@@ -614,14 +614,14 @@ button#pcc-reopen-banner.pcc-reopen-btn svg {
     stroke: currentColor !important;
 }
 
-/* Links placed via shortcode or the pcc-consent-link class elsewhere,
+/* Links placed via shortcode or the pcc-plink class elsewhere,
    or relocated by JS into the theme's own footer menu / copyright row.
    They deliberately inherit the theme's link styling. */
-a.pcc-consent-link {
+a.pcc-plink {
     cursor: pointer;
 }
 
-a.pcc-consent-link svg {
+a.pcc-plink svg {
     width: 14px;
     height: 14px;
     fill: none;
@@ -631,12 +631,12 @@ a.pcc-consent-link svg {
     flex-shrink: 0;
 }
 
-li.pcc-consent-menu-item a.pcc-consent-link {
+li.pcc-menu-item a.pcc-plink {
     display: inline-flex;
     align-items: center;
 }
 
-.pcc-consent-sep {
+.pcc-sep {
     opacity: 0.6;
     margin: 0 2px;
 }
@@ -648,20 +648,20 @@ li.pcc-consent-menu-item a.pcc-consent-link {
         align-items: flex-end;
     }
 
-    .pcc-banner {
+    .pcc-card {
         padding: 28px 22px 24px;
         border-radius: 16px;
     }
 
-    .pcc-banner-header h3 {
+    .pcc-card-header h3 {
         font-size: 19px;
     }
 
-    .pcc-banner-text p {
+    .pcc-card-text p {
         font-size: 13.5px;
     }
 
-    .pcc-banner-actions {
+    .pcc-card-actions {
         flex-direction: column;
     }
 
@@ -687,7 +687,7 @@ li.pcc-consent-menu-item a.pcc-consent-link {
         justify-content: center;
     }
 
-    .pcc-cookie-category {
+    .pcc-ui-category {
         padding: 16px;
     }
 }

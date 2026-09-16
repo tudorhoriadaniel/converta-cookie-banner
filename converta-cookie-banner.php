@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 1.6.1
+ * Version: 1.7.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '1.6.1' );
+define( 'PCC_VERSION', '1.7.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -651,15 +651,28 @@ function pcc_consent_mode_default() {
 add_action( 'wp_enqueue_scripts', 'pcc_enqueue_assets' );
 
 function pcc_enqueue_assets() {
-    wp_enqueue_style( 'pcc-banner-style', PCC_PLUGIN_URL . 'assets/css/banner.css', array(), PCC_VERSION );
-    wp_enqueue_script( 'pcc-banner-script', PCC_PLUGIN_URL . 'assets/js/banner.js', array(), PCC_VERSION, true );
-    wp_localize_script( 'pcc-banner-script', 'pccConfig', array(
+    // Ad-blocker hardening (Brave, uBlock, AdGuard): the plugin folder URL
+    // contains "cookie-banner", which matches ad-block network filters, so
+    // any external CSS/JS file from this plugin can be blocked and the
+    // banner never appears. Therefore the frontend CSS and JS are INLINED
+    // into the page — there is no asset URL to block.
+    $frontend_css = (string) file_get_contents( PCC_PLUGIN_DIR . 'assets/css/banner.css' );
+    $frontend_js  = (string) file_get_contents( PCC_PLUGIN_DIR . 'assets/js/banner.js' );
+
+    wp_register_style( 'pcc-ui', false, array(), PCC_VERSION );
+    wp_enqueue_style( 'pcc-ui' );
+    wp_add_inline_style( 'pcc-ui', $frontend_css );
+
+    wp_register_script( 'pcc-ui', false, array(), PCC_VERSION, true );
+    wp_enqueue_script( 'pcc-ui' );
+    wp_localize_script( 'pcc-ui', 'pccConfig', array(
         'cookieName'   => PCC_COOKIE_NAME,
         'cookieExpiry' => PCC_COOKIE_EXPIRY,
         'cookieDomain' => parse_url( home_url(), PHP_URL_HOST ),
         'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
         'nonce'        => wp_create_nonce( 'pcc_nonce' ),
     ));
+    wp_add_inline_script( 'pcc-ui', $frontend_js );
 
     // Inject custom design colors as inline CSS
     $d = pcc_get_design();
@@ -675,13 +688,13 @@ function pcc_enqueue_assets() {
         --pcc-tag-bg:{$d['tag_bg']};--pcc-tag-border:{$d['tag_border']};
         --pcc-radius:{$radius};--pcc-radius-sm:" . max( absint( $d['banner_radius'] ) - 6, 6 ) . "px;
     }
-    .pcc-banner{border-color:{$d['banner_border']} !important}
-    .pcc-banner-header h3{color:{$d['heading_color']} !important;font-size:{$hfs}px !important}
-    .pcc-banner-text p{color:{$d['text_color']} !important;font-size:{$tfs}px !important}
+    .pcc-card{border-color:{$d['banner_border']} !important}
+    .pcc-card-header h3{color:{$d['heading_color']} !important;font-size:{$hfs}px !important}
+    .pcc-card-text p{color:{$d['text_color']} !important;font-size:{$tfs}px !important}
     .pcc-preferences-header h3{color:{$d['prefs_heading_color']} !important;font-size:{$phs}px !important}
     .pcc-preferences-intro{color:{$d['text_color']} !important;font-size:{$tfs}px !important}
     .pcc-category-desc{color:{$d['text_color']} !important}
-    .pcc-banner-tag{background:{$d['tag_bg']} !important;border-color:{$d['tag_border']} !important;color:{$d['tag_text']} !important}
+    .pcc-card-tag{background:{$d['tag_bg']} !important;border-color:{$d['tag_border']} !important;color:{$d['tag_text']} !important}
     .pcc-btn.pcc-btn-accept{background:{$d['btn_accept_bg']} !important;color:{$d['btn_accept_text']} !important}
     .pcc-btn.pcc-btn-accept:hover{background:{$d['btn_accept_hover']} !important}
     .pcc-btn.pcc-btn-reject{background:{$d['btn_reject_bg']} !important;color:{$d['btn_reject_text']} !important}
@@ -694,15 +707,15 @@ function pcc_enqueue_assets() {
     .pcc-btn.pcc-btn-cancel:hover{background:{$d['btn_cancel_hover']} !important}
     .pcc-toggle input:checked+.pcc-toggle-slider,.pcc-always-on{background:{$d['toggle_on']} !important}
     .pcc-toggle-slider{background:{$d['toggle_off']} !important}
-    .pcc-cookie-table code{background:{$d['table_code_bg']} !important;color:{$d['table_code_text']} !important}
+    .pcc-ui-table code{background:{$d['table_code_bg']} !important;color:{$d['table_code_text']} !important}
     .pcc-reopen-btn{background:{$d['reopen_bg']} !important;color:{$d['reopen_text']} !important}
     .pcc-overlay{background:{$d['overlay_bg']} !important}
-    .pcc-always-active,.pcc-cookie-count{background:{$d['badge_bg']} !important;color:{$d['badge_text']} !important}
+    .pcc-always-active,.pcc-ui-count{background:{$d['badge_bg']} !important;color:{$d['badge_text']} !important}
     .pcc-pref-icon{background:{$d['btn_accept_bg']} !important}
     .pcc-close-btn{background:{$d['close_btn_bg']} !important;color:{$d['close_btn_color']} !important;border-color:rgba(255,255,255,0.1) !important}
     .pcc-close-btn:hover{color:{$d['close_btn_hover']} !important;border-color:{$d['close_btn_hover']} !important}
     .pcc-expand-btn{background:{$d['expand_btn_bg']} !important;color:{$d['expand_btn_color']} !important}";
-    wp_add_inline_style( 'pcc-banner-style', $css );
+    wp_add_inline_style( 'pcc-ui', $css );
 }
 
 // NOTE: The banner markup is intentionally NOT rendered into the page HTML
@@ -710,6 +723,12 @@ function pcc_enqueue_assets() {
 // fetched at runtime by banner.js via the AJAX endpoint below and injected
 // into the DOM client-side.
 
+// Action name deliberately avoids the words "banner"/"cookie"/"consent"
+// so ad-block network filters don't match the request URL.
+add_action( 'wp_ajax_pcc_load_ui', 'pcc_ajax_get_banner' );
+add_action( 'wp_ajax_nopriv_pcc_load_ui', 'pcc_ajax_get_banner' );
+
+// Legacy alias (pages cached with the pre-1.7.0 script).
 add_action( 'wp_ajax_pcc_get_banner', 'pcc_ajax_get_banner' );
 add_action( 'wp_ajax_nopriv_pcc_get_banner', 'pcc_ajax_get_banner' );
 
@@ -755,8 +774,8 @@ function pcc_render_cookie_table( $cookies ) {
         return;
     }
     ?>
-    <div class="pcc-cookie-table-wrap">
-        <table class="pcc-cookie-table">
+    <div class="pcc-ui-table-wrap">
+        <table class="pcc-ui-table">
             <thead>
                 <tr>
                     <th>Cookie</th>
@@ -800,7 +819,7 @@ function pcc_consent_link_shortcode( $atts ) {
     $atts = shortcode_atts( array( 'text' => '' ), $atts, 'pcc_consent_link' );
     $s    = pcc_get_current_strings();
     $text = '' !== $atts['text'] ? esc_html( $atts['text'] ) : ( $s['footer_link'] ?? 'Cookie Settings' );
-    return '<a href="#" class="pcc-consent-link" role="button" data-nosnippet>' . $text . '</a>';
+    return '<a href="#" class="pcc-plink" role="button" data-nosnippet>' . $text . '</a>';
 }
 
 function pcc_render_banner( $path_override = null, $lang_override = null ) {
@@ -808,22 +827,22 @@ function pcc_render_banner( $path_override = null, $lang_override = null ) {
     $s = pcc_get_current_strings( $path_override, $lang_override );
     $reopen_method = pcc_get_reopen_method();
     ?>
-<div id="pcc-cookie-overlay" class="pcc-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Cookie Consent" data-nosnippet>
+<div id="pcc-ui-overlay" class="pcc-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Privacy preferences" data-nosnippet>
 
     <!-- Main Banner -->
-    <div id="pcc-cookie-banner" class="pcc-banner">
-        <div class="pcc-banner-content">
-            <div class="pcc-banner-tag">
+    <div id="pcc-ui-card" class="pcc-card">
+        <div class="pcc-card-content">
+            <div class="pcc-card-tag">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 <?php echo $s['tag']; ?>
             </div>
-            <div class="pcc-banner-header">
+            <div class="pcc-card-header">
                 <h3><?php echo $s['heading']; ?></h3>
             </div>
-            <div class="pcc-banner-text">
+            <div class="pcc-card-text">
                 <p><?php echo $s['body']; ?></p>
             </div>
-            <div class="pcc-banner-actions">
+            <div class="pcc-card-actions">
                 <button id="pcc-accept-all" class="pcc-btn pcc-btn-accept" type="button"><?php echo esc_html( $s['btn_accept'] ); ?></button>
                 <button id="pcc-reject-all" class="pcc-btn pcc-btn-reject" type="button"><?php echo esc_html( $s['btn_reject'] ); ?></button>
                 <button id="pcc-show-preferences" class="pcc-btn pcc-btn-preferences" type="button">
@@ -849,7 +868,7 @@ function pcc_render_banner( $path_override = null, $lang_override = null ) {
             <p class="pcc-preferences-intro"><?php echo $s['pref_intro']; ?></p>
 
             <!-- Necessary -->
-            <div class="pcc-cookie-category">
+            <div class="pcc-ui-category">
                 <div class="pcc-category-header">
                     <div class="pcc-category-info">
                         <strong><?php echo $s['cat_necessary']; ?></strong>
@@ -857,62 +876,62 @@ function pcc_render_banner( $path_override = null, $lang_override = null ) {
                     </div>
                     <label class="pcc-toggle"><input type="checkbox" checked disabled><span class="pcc-toggle-slider pcc-always-on"></span></label>
                     <?php if ( ! empty( $cookie_list['necessary'] ) ) : ?>
-                        <button type="button" class="pcc-expand-btn" data-target="pcc-necessary-cookies" aria-label="Show cookies">
+                        <button type="button" class="pcc-expand-btn" data-target="pcc-necessary-list" aria-label="Show details">
                             &#9660;
                         </button>
                     <?php endif; ?>
                 </div>
                 <p class="pcc-category-desc"><?php echo $s['cat_necessary_desc']; ?></p>
                 <?php if ( ! empty( $cookie_list['necessary'] ) ) : ?>
-                    <div id="pcc-necessary-cookies" class="pcc-cookie-details" style="display:none;">
+                    <div id="pcc-necessary-list" class="pcc-ui-details" style="display:none;">
                         <?php pcc_render_cookie_table( $cookie_list['necessary'] ); ?>
                     </div>
                 <?php endif; ?>
             </div>
 
             <!-- Statistics -->
-            <div class="pcc-cookie-category">
+            <div class="pcc-ui-category">
                 <div class="pcc-category-header">
                     <div class="pcc-category-info">
                         <strong><?php echo $s['cat_analytics']; ?></strong>
                         <?php if ( ! empty( $cookie_list['statistics'] ) ) : ?>
-                            <span class="pcc-cookie-count"><?php echo count( $cookie_list['statistics'] ); ?> cookies</span>
+                            <span class="pcc-ui-count"><?php echo count( $cookie_list['statistics'] ); ?> cookies</span>
                         <?php endif; ?>
                     </div>
                     <label class="pcc-toggle"><input type="checkbox" id="pcc-statistics-toggle" data-category="statistics"><span class="pcc-toggle-slider"></span></label>
                     <?php if ( ! empty( $cookie_list['statistics'] ) ) : ?>
-                        <button type="button" class="pcc-expand-btn" data-target="pcc-statistics-cookies" aria-label="Show cookies">
+                        <button type="button" class="pcc-expand-btn" data-target="pcc-statistics-list" aria-label="Show details">
                             &#9660;
                         </button>
                     <?php endif; ?>
                 </div>
                 <p class="pcc-category-desc"><?php echo $s['cat_analytics_desc']; ?></p>
                 <?php if ( ! empty( $cookie_list['statistics'] ) ) : ?>
-                    <div id="pcc-statistics-cookies" class="pcc-cookie-details" style="display:none;">
+                    <div id="pcc-statistics-list" class="pcc-ui-details" style="display:none;">
                         <?php pcc_render_cookie_table( $cookie_list['statistics'] ); ?>
                     </div>
                 <?php endif; ?>
             </div>
 
             <!-- Marketing -->
-            <div class="pcc-cookie-category">
+            <div class="pcc-ui-category">
                 <div class="pcc-category-header">
                     <div class="pcc-category-info">
                         <strong><?php echo $s['cat_marketing']; ?></strong>
                         <?php if ( ! empty( $cookie_list['marketing'] ) ) : ?>
-                            <span class="pcc-cookie-count"><?php echo count( $cookie_list['marketing'] ); ?> cookies</span>
+                            <span class="pcc-ui-count"><?php echo count( $cookie_list['marketing'] ); ?> cookies</span>
                         <?php endif; ?>
                     </div>
                     <label class="pcc-toggle"><input type="checkbox" id="pcc-marketing-toggle" data-category="marketing"><span class="pcc-toggle-slider"></span></label>
                     <?php if ( ! empty( $cookie_list['marketing'] ) ) : ?>
-                        <button type="button" class="pcc-expand-btn" data-target="pcc-marketing-cookies" aria-label="Show cookies">
+                        <button type="button" class="pcc-expand-btn" data-target="pcc-marketing-list" aria-label="Show details">
                             &#9660;
                         </button>
                     <?php endif; ?>
                 </div>
                 <p class="pcc-category-desc"><?php echo $s['cat_marketing_desc']; ?></p>
                 <?php if ( ! empty( $cookie_list['marketing'] ) ) : ?>
-                    <div id="pcc-marketing-cookies" class="pcc-cookie-details" style="display:none;">
+                    <div id="pcc-marketing-list" class="pcc-ui-details" style="display:none;">
                         <?php pcc_render_cookie_table( $cookie_list['marketing'] ); ?>
                     </div>
                 <?php endif; ?>
@@ -929,14 +948,14 @@ function pcc_render_banner( $path_override = null, $lang_override = null ) {
 </div>
 
 <?php if ( 'icon' === $reopen_method || 'both' === $reopen_method ) : ?>
-<button id="pcc-reopen-banner" class="pcc-reopen-btn" type="button" aria-label="Cookie Settings" style="display:none;" title="Cookie Settings">
+<button id="pcc-reopen" class="pcc-reopen-btn" type="button" aria-label="Privacy preferences" style="display:none;" title="Privacy preferences">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01"/><path d="M16 15.5v.01"/><path d="M12 12v.01"/><path d="M11 17v.01"/><path d="M7 14v.01"/></svg>
 </button>
 <?php endif; ?>
 
 <?php if ( 'footer_link' === $reopen_method || 'both' === $reopen_method ) : ?>
-<div class="pcc-footer-consent-bar" data-nosnippet>
-    <a href="#" class="pcc-consent-link" role="button">
+<div class="pcc-footer-bar" data-nosnippet>
+    <a href="#" class="pcc-plink" role="button">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01"/><path d="M16 15.5v.01"/><path d="M12 12v.01"/><path d="M11 17v.01"/><path d="M7 14v.01"/></svg>
         <?php echo $s['footer_link'] ?? 'Cookie Settings'; ?>
     </a>
@@ -985,7 +1004,7 @@ function pcc_admin_menu() {
         'Banner Design',
         'Banner Design',
         'manage_options',
-        'pcc-banner-design',
+        'pcc-card-design',
         'pcc_admin_design_page'
     );
 
@@ -1004,7 +1023,7 @@ add_action( 'admin_enqueue_scripts', 'pcc_admin_assets' );
 function pcc_admin_assets( $hook ) {
     $stats_hook   = 'toplevel_page_pcc-cookie-stats';
     $scanner_hook = 'cookie-consent_page_pcc-cookie-scanner';
-    $design_hook  = 'cookie-consent_page_pcc-banner-design';
+    $design_hook  = 'cookie-consent_page_pcc-card-design';
     $trans_hook   = 'cookie-consent_page_pcc-translations';
 
     if ( ! in_array( $hook, array( $stats_hook, $scanner_hook, $design_hook, $trans_hook ), true ) ) {
@@ -1041,7 +1060,7 @@ function pcc_admin_assets( $hook ) {
 
     if ( $hook === $design_hook ) {
         wp_enqueue_style( 'wp-color-picker' );
-        wp_enqueue_style( 'pcc-banner-style', PCC_PLUGIN_URL . 'assets/css/banner.css', array(), PCC_VERSION );
+        wp_enqueue_style( 'pcc-card-style', PCC_PLUGIN_URL . 'assets/css/banner.css', array(), PCC_VERSION );
         wp_enqueue_script( 'pcc-design-script', PCC_PLUGIN_URL . 'assets/js/design.js', array( 'wp-color-picker' ), PCC_VERSION, true );
         wp_localize_script( 'pcc-design-script', 'pccDesign', array(
             'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
@@ -1204,7 +1223,7 @@ function pcc_admin_scanner_page() {
                 </thead>
                 <tbody id="pcc-cookie-tbody"></tbody>
             </table>
-            <div class="pcc-cookie-table-actions">
+            <div class="pcc-ui-table-actions">
                 <button id="pcc-add-cookie" class="button">+ Add Cookie</button>
                 <button id="pcc-save-cookies" class="button button-primary">Save Cookie List</button>
             </div>
@@ -1434,7 +1453,7 @@ function pcc_admin_design_page() {
                     </div>
                 </label>
             </div>
-            <p style="margin-bottom:0;color:#666;">Tip: you can also place the link yourself anywhere (footer menu, widget, privacy page) with the shortcode <code>[pcc_consent_link]</code> or by adding the CSS class <code>pcc-consent-link</code> to any link &mdash; those work with every option above. Remember to click <strong>Save Design</strong> below.</p>
+            <p style="margin-bottom:0;color:#666;">Tip: you can also place the link yourself anywhere (footer menu, widget, privacy page) with the shortcode <code>[pcc_consent_link]</code> or by adding the CSS class <code>pcc-plink</code> to any link &mdash; those work with every option above. Remember to click <strong>Save Design</strong> below.</p>
         </div>
 
         <div class="pcc-design-layout">
@@ -1495,7 +1514,7 @@ function pcc_admin_design_page() {
                 <h3>Live Preview</h3>
                 <div id="pcc-preview-frame" class="pcc-preview-frame">
                     <div class="pcc-preview-banner" id="pcc-preview-banner">
-                        <div class="pcc-banner-tag" id="pv-tag">
+                        <div class="pcc-card-tag" id="pv-tag">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                             Privacy &amp; Cookies
                         </div>

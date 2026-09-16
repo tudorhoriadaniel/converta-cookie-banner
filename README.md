@@ -2,7 +2,7 @@
 
 GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2**, a built-in cookie scanner, consent statistics dashboard, full design customizer, and translations in 6 languages.
 
-**Version:** 1.6.1 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
+**Version:** 1.7.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
 
 ## Features
 
@@ -16,7 +16,7 @@ GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2*
   - **Floating icon** — small round button fixed bottom-left (default)
   - **Footer link** — a discreet translated text link ("Cookie Settings" / "Paramètres des cookies" / "Cookie-Einstellungen" / …) at the bottom of every page
   - **Both**
-  - Plus a shortcode `[pcc_consent_link]` (optional `text="…"` attribute) and support for adding the CSS class `pcc-consent-link` to any link or menu item — these work with every option above.
+  - Plus a shortcode `[pcc_consent_link]` (optional `text="…"` attribute) and support for adding the CSS class `pcc-plink` to any link or menu item (the old `pcc-consent-link` class keeps working) — these work with every option above.
 - **dataLayer events** — fires `cookie_necessary`, `cookie_analytics`, `cookie_marketing`, `cookie_functional` events for GTM triggers based on the granted categories, on every page load for returning visitors.
 
 ## Installation
@@ -52,6 +52,14 @@ Verify with [Google Tag Assistant](https://tagassistant.google.com/): **Consent 
 - Uninstalling the plugin drops the log table and deletes all plugin options.
 
 ## Changelog
+
+### 1.7.0
+- **Ad-blocker hardening (Brave, uBlock Origin, AdGuard):** the banner was invisible for visitors with cookie-notice-blocking filters enabled, because (a) the plugin's asset URLs contain "cookie-banner" and were blocked by network filters, and (b) its element ids/classes (`pcc-cookie-banner`, `pcc-consent-link`, …) matched cosmetic hiding filters. Fixes:
+  - Frontend CSS and JS are now **inlined into the page** — no external plugin asset URLs to block
+  - All frontend ids/classes renamed to neutral names with no "cookie"/"consent"/"banner" words (`pcc-ui-card`, `pcc-ui-overlay`, `pcc-plink`, …)
+  - AJAX action renamed `pcc_get_banner` → `pcc_load_ui` (old name kept as alias)
+  - Neutral `aria-label`/`title` attributes
+  - Manually placed links with the old `pcc-consent-link` class are automatically migrated to `pcc-plink` at runtime — existing menu items keep working
 
 ### 1.6.1
 - Corrected plugin/author URLs to converta.ro
