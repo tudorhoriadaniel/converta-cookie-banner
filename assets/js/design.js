@@ -39,17 +39,22 @@
         });
     });
 
-    // ── Reopen method radios ──
+    // ── Radio option groups (reopen method, GTM blocking mode) ──
 
-    document.querySelectorAll('input[name="pcc_reopen_method"]').forEach(function (radio) {
-        radio.addEventListener('change', function () {
-            design.reopen_method = this.value;
-            document.querySelectorAll('input[name="pcc_reopen_method"]').forEach(function (r) {
-                var m = r.closest('.pcc-trans-method');
-                if (m) m.classList.toggle('pcc-method-active', r.checked);
+    function bindRadioGroup(name, key) {
+        document.querySelectorAll('input[name="' + name + '"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                design[key] = this.value;
+                document.querySelectorAll('input[name="' + name + '"]').forEach(function (r) {
+                    var m = r.closest('.pcc-trans-method');
+                    if (m) m.classList.toggle('pcc-method-active', r.checked);
+                });
             });
         });
-    });
+    }
+
+    bindRadioGroup('pcc_reopen_method', 'reopen_method');
+    bindRadioGroup('pcc_gtm_blocking', 'gtm_blocking');
 
     // ── Live Preview ──
 
@@ -157,11 +162,13 @@
                         $(this).wpColorPicker('color', design[key]);
                     }
                 });
-                // Update reopen method radios
-                document.querySelectorAll('input[name="pcc_reopen_method"]').forEach(function (r) {
-                    r.checked = (r.value === design.reopen_method);
-                    var m = r.closest('.pcc-trans-method');
-                    if (m) m.classList.toggle('pcc-method-active', r.checked);
+                // Update radio option groups
+                [['pcc_reopen_method', 'reopen_method'], ['pcc_gtm_blocking', 'gtm_blocking']].forEach(function (pair) {
+                    document.querySelectorAll('input[name="' + pair[0] + '"]').forEach(function (r) {
+                        r.checked = (r.value === design[pair[1]]);
+                        var m = r.closest('.pcc-trans-method');
+                        if (m) m.classList.toggle('pcc-method-active', r.checked);
+                    });
                 });
                 // Update all sliders
                 document.querySelectorAll('.pcc-slider').forEach(function (sl) {

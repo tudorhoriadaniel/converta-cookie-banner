@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '1.7.0' );
+define( 'PCC_VERSION', '1.8.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -468,6 +468,11 @@ function pcc_design_defaults() {
         'overlay_bg'           => 'rgba(5,10,25,0.65)',
         // How visitors reopen the banner: 'icon', 'footer_link', or 'both'
         'reopen_method'        => 'icon',
+        // GTM handling: 'advanced' (default) = Google Tag Manager loads
+        // immediately, Consent Mode signals control the tags inside it.
+        // 'basic' = the GTM/gtag script itself is blocked until the visitor
+        // grants statistics or marketing consent.
+        'gtm_blocking'         => 'advanced',
     );
 }
 
@@ -498,6 +503,10 @@ function pcc_ajax_save_design() {
 
     if ( ! in_array( $clean['reopen_method'], array( 'icon', 'footer_link', 'both' ), true ) ) {
         $clean['reopen_method'] = 'icon';
+    }
+
+    if ( ! in_array( $clean['gtm_blocking'], array( 'advanced', 'basic' ), true ) ) {
+        $clean['gtm_blocking'] = 'advanced';
     }
 
     update_option( 'pcc_design', $clean );
@@ -628,10 +637,48 @@ function pcc_inject_consent_script( $html ) {
 
     if ( preg_match( '/<head\b[^>]*>/i', $html, $m, PREG_OFFSET_CAPTURE ) ) {
         $pos = $m[0][1] + strlen( $m[0][0] );
-        return substr( $html, 0, $pos ) . "\n" . $script . substr( $html, $pos );
+        $html = substr( $html, 0, $pos ) . "\n" . $script . substr( $html, $pos );
+    }
+
+    // Basic Consent Mode (opt-in, NOT default): neutralize every
+    // GTM/gtag <script> so it does not execute until the visitor grants
+    // statistics or marketing consent; banner.js re-activates them.
+    $d = pcc_get_design();
+    if ( ( $d['gtm_blocking'] ?? 'advanced' ) === 'basic' ) {
+        $html = pcc_neutralize_gtm_scripts( $html );
     }
 
     return $html;
+}
+
+/**
+ * Turn every script that loads or references googletagmanager.com into an
+ * inert <script type="text/plain" data-pcc-gtm="1"> so the browser does not
+ * execute it. banner.js re-activates these scripts once the visitor grants
+ * statistics or marketing consent (or on load for returning visitors who
+ * already granted).
+ */
+function pcc_neutralize_gtm_scripts( $html ) {
+    return preg_replace_callback(
+        '#<script\b([^>]*)>(.*?)</script>#is',
+        function ( $m ) {
+            $attrs = $m[1];
+            $body  = $m[2];
+
+            if ( false === stripos( $attrs, 'googletagmanager.com' ) && false === stripos( $body, 'googletagmanager.com' ) ) {
+                return $m[0];
+            }
+            // Never touch our own consent script or already-processed tags.
+            if ( false !== stripos( $attrs, 'data-pcc-consent' ) || false !== stripos( $attrs, 'data-pcc-gtm' ) || false !== stripos( $attrs, 'text/plain' ) ) {
+                return $m[0];
+            }
+
+            $attrs = preg_replace( '#\stype=("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $attrs );
+
+            return '<script type="text/plain" data-pcc-gtm="1"' . $attrs . '>' . $body . '</script>';
+        },
+        $html
+    );
 }
 
 // Fallback for setups where output buffering could not start.
@@ -1454,6 +1501,34 @@ function pcc_admin_design_page() {
                 </label>
             </div>
             <p style="margin-bottom:0;color:#666;">Tip: you can also place the link yourself anywhere (footer menu, widget, privacy page) with the shortcode <code>[pcc_consent_link]</code> or by adding the CSS class <code>pcc-plink</code> to any link &mdash; those work with every option above. Remember to click <strong>Save Design</strong> below.</p>
+        </div>
+
+        <!-- Google Tag Manager blocking mode -->
+        <?php
+        $gtm_blocking = $d['gtm_blocking'] ?? 'advanced';
+        if ( ! in_array( $gtm_blocking, array( 'advanced', 'basic' ), true ) ) {
+            $gtm_blocking = 'advanced';
+        }
+        ?>
+        <div class="pcc-design-section" style="margin-bottom:20px;">
+            <h3>Google Tag Manager &mdash; blocking mode</h3>
+            <p style="margin-top:0;">The plugin never has to block the GTM script for GDPR compliance: with Consent Mode v2, GTM loads but every Google tag stays cookieless until consent. Choose how strict you want to be.</p>
+            <div class="pcc-trans-methods" style="display:flex;gap:16px;flex-wrap:wrap;">
+                <label class="pcc-trans-method<?php echo 'advanced' === $gtm_blocking ? ' pcc-method-active' : ''; ?>">
+                    <input type="radio" name="pcc_gtm_blocking" value="advanced" <?php checked( $gtm_blocking, 'advanced' ); ?>>
+                    <div class="pcc-method-content">
+                        <strong>Advanced Consent Mode (recommended, default)</strong>
+                        <span>GTM loads immediately on every page. Consent Mode signals control the tags: before consent, Google tags send only cookieless pings; after consent, full tracking. Best for data quality (enables behavioral modeling in GA4).</span>
+                    </div>
+                </label>
+                <label class="pcc-trans-method<?php echo 'basic' === $gtm_blocking ? ' pcc-method-active' : ''; ?>">
+                    <input type="radio" name="pcc_gtm_blocking" value="basic" <?php checked( $gtm_blocking, 'basic' ); ?>>
+                    <div class="pcc-method-content">
+                        <strong>Basic Consent Mode (hard block)</strong>
+                        <span>The GTM/gtag script itself is prevented from loading until the visitor grants Statistics or Marketing consent. No requests to googletagmanager.com before consent &mdash; but you lose all data from visitors who reject or ignore the banner.</span>
+                    </div>
+                </label>
+            </div>
         </div>
 
         <div class="pcc-design-layout">

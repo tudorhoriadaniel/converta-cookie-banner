@@ -92,11 +92,33 @@
     var overlay = null, banner = null, prefsPanel = null, reopenBtn = null;
     var bannerLoaded = false, bannerLoading = false, pendingShow = false;
 
+    // ---- Basic Consent Mode: re-activate hard-blocked GTM scripts ----
+    // (Scripts are only neutralized server-side when the "Block GTM until
+    // consent" option is enabled; otherwise this is a harmless no-op.)
+
+    function activateBlockedTags() {
+        document.querySelectorAll('script[data-pcc-gtm]').forEach(function (old) {
+            if (old.getAttribute('data-pcc-activated')) return;
+            old.setAttribute('data-pcc-activated', '1');
+            var s = document.createElement('script');
+            for (var i = 0; i < old.attributes.length; i++) {
+                var a = old.attributes[i];
+                if (a.name === 'type' || a.name === 'data-pcc-gtm' || a.name === 'data-pcc-activated') continue;
+                s.setAttribute(a.name, a.value);
+            }
+            s.text = old.text;
+            old.parentNode.insertBefore(s, old.nextSibling);
+        });
+    }
+
     // ---- Save & Apply ----
 
     function saveConsent(action, consent) {
         setCookie(COOKIE_NAME, consent, COOKIE_EXPIRY);
         updateConsentMode(consent);
+        if (consent.statistics || consent.marketing) {
+            activateBlockedTags();
+        }
         pushConsentEvents(consent);
         logConsent(action, consent);
         hideBanner();
@@ -345,10 +367,19 @@
     // Necessary cookies are always active — fire on every page load
     window.dataLayer.push({ 'event': 'cookie_necessary' });
 
-    // Returning visitor — re-fire consent events immediately (no DOM needed)
+    // Returning visitor — re-fire consent events immediately, and if GTM
+    // hard-blocking is enabled, load GTM right away for visitors who
+    // already granted statistics or marketing consent.
     var existing0 = getCookie(COOKIE_NAME);
     if (existing0 && existing0.timestamp) {
         pushConsentEvents(existing0);
+        if (existing0.statistics || existing0.marketing) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', activateBlockedTags);
+            } else {
+                activateBlockedTags();
+            }
+        }
     }
 
     // Consent links placed manually (menu items, shortcode) work even
