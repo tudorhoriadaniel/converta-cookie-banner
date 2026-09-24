@@ -4,6 +4,8 @@ GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2*
 
 **Version:** 2.4.2 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
 
+📖 **Complete user guide:** [Română](docs/GHID-UTILIZARE.md) · [English](docs/USER-GUIDE.md) · [Français](docs/GUIDE-UTILISATION.md) — installation, GTM integration, banner design, multilingual legal pages (Polylang/WPML), updates & rollback, troubleshooting.
+
 ## Features
 
 - **Google Consent Mode v2** — pushes `consent default` (all denied except `security_storage`) and, for returning visitors, `consent update` **before Google Tag Manager loads**, no matter how GTM is installed (theme `header.php`, another plugin, `wp_head`, hardcoded snippet). The script is injected as the very first script after `<head>` via output buffering, with an early `wp_head` fallback.
