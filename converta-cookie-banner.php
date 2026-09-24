@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.0.0' );
+define( 'PCC_VERSION', '2.0.1' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -899,6 +899,16 @@ function pcc_normalize_github_source( $source, $remote_source, $upgrader, $hook_
 }
 
 // After this plugin updates, forget the cached remote version.
+// "Check again" on Dashboard → Updates must bypass our 6-hour cache too,
+// so a just-pushed release shows up immediately on a forced check.
+add_action( 'load-update-core.php', 'pcc_force_update_check' );
+
+function pcc_force_update_check() {
+    if ( isset( $_GET['force-check'] ) ) {
+        delete_site_transient( 'pcc_github_version' );
+    }
+}
+
 add_action( 'upgrader_process_complete', 'pcc_flush_update_cache', 10, 2 );
 
 function pcc_flush_update_cache( $upgrader, $hook_extra ) {
