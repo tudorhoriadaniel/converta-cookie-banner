@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.1.0
+ * Version: 2.2.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.1.0' );
+define( 'PCC_VERSION', '2.2.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -922,6 +922,125 @@ function pcc_get_github_tags() {
     return $tags;
 }
 
+/**
+ * README.md from GitHub main (cached 6 hours) — source of the changelog.
+ */
+function pcc_get_remote_readme() {
+    $cached = get_site_transient( 'pcc_github_readme' );
+    if ( false !== $cached ) {
+        return $cached;
+    }
+    $resp = wp_remote_get(
+        'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/contents/README.md?ref=main',
+        array( 'timeout' => 10, 'headers' => array( 'Accept' => 'application/vnd.github.raw+json' ) )
+    );
+    if ( is_wp_error( $resp ) || 200 !== wp_remote_retrieve_response_code( $resp ) ) {
+        return '';
+    }
+    $body = wp_remote_retrieve_body( $resp );
+    set_site_transient( 'pcc_github_readme', $body, 6 * HOUR_IN_SECONDS );
+    return $body;
+}
+
+/**
+ * Changelog parsed from the README: version => array( 'summary' => first
+ * bullet (plain text), 'html' => full section as simple HTML ).
+ */
+function pcc_get_changelog_map() {
+    $md = pcc_get_remote_readme();
+    if ( ! $md ) {
+        return array();
+    }
+    $map = array();
+    if ( preg_match_all( '/^### ([0-9][0-9a-z.\-]*)\s*\n(.*?)(?=^### |\z)/ms', $md, $m, PREG_SET_ORDER ) ) {
+        foreach ( $m as $sec ) {
+            $version = trim( $sec[1] );
+            $body    = trim( $sec[2] );
+
+            $summary = '';
+            foreach ( explode( "\n", $body ) as $line ) {
+                $line = trim( $line );
+                if ( 0 === strpos( $line, '- ' ) ) {
+                    $summary = substr( $line, 2 );
+                    break;
+                }
+            }
+            $summary = pcc_strip_markdown( $summary );
+
+            $html  = '';
+            $in_ul = false;
+            foreach ( explode( "\n", $body ) as $line ) {
+                $trimmed = trim( $line );
+                if ( '' === $trimmed ) {
+                    continue;
+                }
+                if ( 0 === strpos( $trimmed, '- ' ) ) {
+                    if ( ! $in_ul ) {
+                        $html .= '<ul>';
+                        $in_ul = true;
+                    }
+                    $html .= '<li>' . pcc_md_inline( substr( $trimmed, 2 ) ) . '</li>';
+                } else {
+                    if ( $in_ul ) {
+                        $html .= '</ul>';
+                        $in_ul = false;
+                    }
+                    $html .= '<p>' . pcc_md_inline( $trimmed ) . '</p>';
+                }
+            }
+            if ( $in_ul ) {
+                $html .= '</ul>';
+            }
+
+            $map[ $version ] = array( 'summary' => $summary, 'html' => $html );
+        }
+    }
+    return $map;
+}
+
+function pcc_strip_markdown( $text ) {
+    $text = preg_replace( '/\[([^\]]*)\]\([^)]*\)/', '$1', $text );
+    $text = str_replace( array( '**', '`', '*' ), '', $text );
+    return trim( wp_strip_all_tags( $text ) );
+}
+
+function pcc_md_inline( $text ) {
+    $text = esc_html( pcc_strip_markdown( $text ) );
+    return $text;
+}
+
+/**
+ * "View details" popup on the Plugins page: serve real information and the
+ * full changelog from GitHub instead of a "plugin not found" error.
+ */
+add_filter( 'plugins_api', 'pcc_plugins_api_info', 10, 3 );
+
+function pcc_plugins_api_info( $res, $action, $args ) {
+    if ( 'plugin_information' !== $action || empty( $args->slug ) || dirname( plugin_basename( __FILE__ ) ) !== $args->slug ) {
+        return $res;
+    }
+
+    $changelog = '';
+    foreach ( pcc_get_changelog_map() as $version => $entry ) {
+        $changelog .= '<h4>' . esc_html( $version ) . '</h4>' . $entry['html'];
+    }
+
+    return (object) array(
+        'name'          => 'Converta Cookie Banner',
+        'slug'          => $args->slug,
+        'version'       => pcc_get_remote_version() ?: PCC_VERSION,
+        'author'        => '<a href="https://converta.ro">Converta</a>',
+        'homepage'      => 'https://github.com/' . PCC_GITHUB_REPO,
+        'requires'      => '5.8',
+        'requires_php'  => '7.4',
+        'sections'      => array(
+            'description' => '<p>GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, consent statistics, legal pages management and self-updates from GitHub.</p>',
+            'changelog'   => $changelog ?: '<p>See the repository for details.</p>',
+        ),
+        'download_link' => 'https://github.com/' . PCC_GITHUB_REPO . '/archive/refs/heads/main.zip',
+    );
+}
+
 // One-click rollback / version switch, driven from the Banner Design page.
 add_action( 'admin_post_pcc_rollback', 'pcc_handle_rollback' );
 
@@ -1036,6 +1155,7 @@ function pcc_force_update_check() {
     if ( isset( $_GET['force-check'] ) ) {
         delete_site_transient( 'pcc_github_version' );
         delete_site_transient( 'pcc_github_tags' );
+        delete_site_transient( 'pcc_github_readme' );
     }
 }
 
@@ -2296,11 +2416,20 @@ function pcc_admin_design_page() {
                     <a class="button" href="<?php echo esc_url( $pcc_rb_base . '&version=latest' ); ?>">Resume updates (back to latest)</a>
                 </p>
             <?php endif; ?>
-            <?php if ( $pcc_tags ) : ?>
+            <?php if ( $pcc_tags ) : $pcc_changelog = pcc_get_changelog_map(); ?>
             <div style="display:flex;gap:8px;align-items:center;">
-                <select id="pcc-rollback-version">
-                    <?php foreach ( $pcc_tags as $pcc_tag ) : ?>
-                        <option value="<?php echo esc_attr( $pcc_tag ); ?>"><?php echo esc_html( $pcc_tag . ( ltrim( $pcc_tag, 'vV' ) === PCC_VERSION ? ' (installed)' : '' ) ); ?></option>
+                <select id="pcc-rollback-version" style="max-width:560px;">
+                    <?php foreach ( $pcc_tags as $pcc_tag ) :
+                        $pcc_num   = ltrim( $pcc_tag, 'vV' );
+                        $pcc_desc  = isset( $pcc_changelog[ $pcc_num ]['summary'] ) ? $pcc_changelog[ $pcc_num ]['summary'] : '';
+                        if ( function_exists( 'mb_substr' ) && mb_strlen( $pcc_desc ) > 80 ) {
+                            $pcc_desc = mb_substr( $pcc_desc, 0, 77 ) . '…';
+                        }
+                        $pcc_label = $pcc_tag
+                            . ( $pcc_num === PCC_VERSION ? ' (installed)' : '' )
+                            . ( $pcc_desc ? ' — ' . $pcc_desc : '' );
+                    ?>
+                        <option value="<?php echo esc_attr( $pcc_tag ); ?>"><?php echo esc_html( $pcc_label ); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <a class="button" href="#" id="pcc-rollback-go">Install selected version</a>
@@ -2431,4 +2560,5 @@ function pcc_uninstall() {
     delete_option( 'pcc_pin_version' );
     delete_site_transient( 'pcc_github_version' );
     delete_site_transient( 'pcc_github_tags' );
+    delete_site_transient( 'pcc_github_readme' );
 }
