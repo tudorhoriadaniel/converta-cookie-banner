@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.3.0
+ * Version: 2.3.1
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.3.0' );
+define( 'PCC_VERSION', '2.3.1' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -1533,11 +1533,10 @@ if ( ! empty( $pcc_legal['footer_links'] ) ) {
 function pcc_company_defaults() {
     return array(
         'company_name' => '',
-        'legal_name'   => '',
         'cui'          => '',
         'reg_com'      => '',
         'address'      => '',
-        'email'        => get_option( 'admin_email' ),
+        'email'        => '',
         'phone'        => '',
         'website'      => home_url(),
     );
@@ -1639,7 +1638,7 @@ function pcc_detect_legal_page( $type ) {
 function pcc_legal_template( $type, $c ) {
     $lang    = strtolower( substr( get_locale(), 0, 2 ) );
     $name    = $c['company_name'] ?: '[numele companiei]';
-    $legal   = $c['legal_name'] ?: $name;
+    $legal   = $name;
     $cui     = $c['cui'] ?: '[CUI]';
     $regcom  = $c['reg_com'] ?: '';
     $address = $c['address'] ?: '[adresa]';
@@ -1799,14 +1798,13 @@ function pcc_admin_legal_page() {
     $nonce   = wp_create_nonce( 'pcc_legal_nonce' );
 
     $fields = array(
-        'company_name' => array( 'Brand / Company Name', 'e.g. Righta Agency' ),
-        'legal_name'   => array( 'Legal Entity Name', 'e.g. Righta Agency SRL' ),
-        'cui'          => array( 'CUI / VAT Number', 'e.g. RO12345678' ),
-        'reg_com'      => array( 'Trade Registry No. (optional)', 'e.g. J40/1234/2020' ),
+        'company_name' => array( 'Brand / Company Name', 'e.g. Example SRL' ),
+        'cui'          => array( 'CUI / VAT Number', 'e.g. RO00000000' ),
+        'reg_com'      => array( 'Trade Registry No. (optional)', 'e.g. J00/000/0000' ),
         'address'      => array( 'Registered Address', 'Street, city, country' ),
-        'email'        => array( 'Contact Email', '' ),
+        'email'        => array( 'Contact Email', 'example@example.com' ),
         'phone'        => array( 'Phone (optional)', '' ),
-        'website'      => array( 'Website URL', '' ),
+        'website'      => array( 'Website URL', 'https://example.com' ),
     );
 
     $types = array(
