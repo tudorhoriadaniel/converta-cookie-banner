@@ -2,7 +2,7 @@
 
 GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2**, a built-in cookie scanner, consent statistics dashboard, full design customizer, and translations in 6 languages.
 
-**Version:** 2.0.1 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
+**Version:** 2.1.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
 
 ## Features
 
@@ -56,6 +56,11 @@ Verify with [Google Tag Assistant](https://tagassistant.google.com/): **Consent 
 - Uninstalling the plugin drops the log table and deletes all plugin options.
 
 ## Changelog
+
+### 2.1.0
+- **One-click version switch / rollback** (Banner Design → Plugin Updates from GitHub): pick any released version from a dropdown and install it directly — no zips, correct folder naming, settings and statistics preserved. After a rollback, updates are **pinned** to that version (the site won't be offered the newer release again) until you press "Resume updates".
+- All releases are now tagged on GitHub (v1.5.0 → current), so every version stays permanently available.
+- Fix: saving an empty GitHub token no longer clears the company data and legal-pages settings (regression from 2.0.0's uninstall cleanup).
 
 ### 2.0.1
 - "Check again" on Dashboard → Updates now bypasses the plugin's 6-hour GitHub version cache, so freshly pushed releases appear immediately on a forced check

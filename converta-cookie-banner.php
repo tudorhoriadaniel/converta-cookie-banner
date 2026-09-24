@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.0.1
+ * Version: 2.1.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.0.1' );
+define( 'PCC_VERSION', '2.1.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -856,6 +856,21 @@ function pcc_github_update_info( $update, $plugin_data, $plugin_file ) {
         return $update;
     }
 
+    // Pinned version (after a rollback): report the pinned version so the
+    // site is not immediately offered the newest release again. Cleared
+    // with the "resume updates" button.
+    $pin = get_option( 'pcc_pin_version', '' );
+    if ( $pin ) {
+        return array(
+            'id'      => 'https://github.com/' . PCC_GITHUB_REPO,
+            'slug'    => dirname( plugin_basename( __FILE__ ) ),
+            'plugin'  => $plugin_file,
+            'version' => ltrim( $pin, 'vV' ),
+            'url'     => 'https://github.com/' . PCC_GITHUB_REPO,
+            'package' => 'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/zipball/refs/tags/' . rawurlencode( $pin ),
+        );
+    }
+
     $remote = pcc_get_remote_version();
     if ( ! $remote ) {
         return $update;
@@ -875,6 +890,120 @@ function pcc_github_update_info( $update, $plugin_data, $plugin_file ) {
         'url'     => 'https://github.com/' . PCC_GITHUB_REPO,
         'package' => $package,
     );
+}
+
+/**
+ * Version tags published on GitHub (v1.5.0, v1.5.1, …), newest first.
+ * Cached 6 hours.
+ */
+function pcc_get_github_tags() {
+    $cached = get_site_transient( 'pcc_github_tags' );
+    if ( is_array( $cached ) ) {
+        return $cached;
+    }
+    $resp = wp_remote_get(
+        'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/tags?per_page=100',
+        array( 'timeout' => 10 )
+    );
+    if ( is_wp_error( $resp ) || 200 !== wp_remote_retrieve_response_code( $resp ) ) {
+        return array();
+    }
+    $data = json_decode( wp_remote_retrieve_body( $resp ), true );
+    $tags = array();
+    foreach ( (array) $data as $t ) {
+        if ( ! empty( $t['name'] ) ) {
+            $tags[] = $t['name'];
+        }
+    }
+    usort( $tags, function ( $a, $b ) {
+        return version_compare( ltrim( $b, 'vV' ), ltrim( $a, 'vV' ) );
+    } );
+    set_site_transient( 'pcc_github_tags', $tags, 6 * HOUR_IN_SECONDS );
+    return $tags;
+}
+
+// One-click rollback / version switch, driven from the Banner Design page.
+add_action( 'admin_post_pcc_rollback', 'pcc_handle_rollback' );
+
+function pcc_handle_rollback() {
+    if ( ! current_user_can( 'update_plugins' ) ) {
+        wp_die( 'Unauthorized' );
+    }
+    check_admin_referer( 'pcc_rollback' );
+
+    $version    = sanitize_text_field( wp_unslash( $_GET['version'] ?? '' ) );
+    $design_url = admin_url( 'admin.php?page=pcc-card-design' );
+
+    // "latest" = unpin and resume normal updates.
+    if ( 'latest' === $version ) {
+        delete_option( 'pcc_pin_version' );
+        delete_site_transient( 'pcc_github_version' );
+        wp_safe_redirect( $design_url );
+        exit;
+    }
+
+    $tags = pcc_get_github_tags();
+    if ( ! in_array( $version, $tags, true ) ) {
+        wp_die( 'Unknown version: ' . esc_html( $version ) );
+    }
+
+    $plugin_file = plugin_basename( __FILE__ );
+    $was_active  = is_plugin_active( $plugin_file );
+    $ver_number  = ltrim( $version, 'vV' );
+    $package     = 'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/zipball/refs/tags/' . rawurlencode( $version );
+
+    // Pin BEFORE installing, so the updater doesn't fight the rollback.
+    update_option( 'pcc_pin_version', $version, false );
+    delete_site_transient( 'pcc_github_version' );
+
+    // Feed the chosen package to the standard WordPress plugin upgrader.
+    add_filter( 'site_transient_update_plugins', function ( $t ) use ( $plugin_file, $ver_number, $package ) {
+        if ( ! is_object( $t ) ) {
+            $t = new stdClass();
+        }
+        if ( ! isset( $t->response ) || ! is_array( $t->response ) ) {
+            $t->response = array();
+        }
+        $t->response[ $plugin_file ] = (object) array(
+            'slug'        => dirname( $plugin_file ),
+            'plugin'      => $plugin_file,
+            'new_version' => $ver_number,
+            'url'         => 'https://github.com/' . PCC_GITHUB_REPO,
+            'package'     => $package,
+        );
+        return $t;
+    } );
+
+    require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/misc.php';
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+    echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Version switch</title></head><body style="font-family:-apple-system,sans-serif;max-width:720px;margin:40px auto;line-height:1.6;">';
+    echo '<h1 style="font-size:20px;">Installing Converta Cookie Banner ' . esc_html( $version ) . '&hellip;</h1>';
+
+    $upgrader = new Plugin_Upgrader( new Plugin_Upgrader_Skin() );
+    $result   = $upgrader->upgrade( $plugin_file );
+
+    if ( $result && ! is_wp_error( $result ) ) {
+        // The upgrader deactivates the plugin during replacement; restore
+        // activation without re-including the (already loaded) plugin file.
+        if ( $was_active ) {
+            $active = get_option( 'active_plugins', array() );
+            if ( ! in_array( $plugin_file, $active, true ) ) {
+                $active[] = $plugin_file;
+                sort( $active );
+                update_option( 'active_plugins', $active );
+            }
+        }
+        echo '<p><strong>Done.</strong> Version ' . esc_html( $version ) . ' is installed and updates are paused (pinned to this version). Use &ldquo;Resume updates&rdquo; on the Banner Design page when you want the latest version again.</p>';
+    } else {
+        delete_option( 'pcc_pin_version' );
+        echo '<p><strong>The version switch failed.</strong> The previous files may still be in place; check the Plugins page.</p>';
+    }
+
+    echo '<p><a href="' . esc_url( $design_url ) . '">&larr; Back to Banner Design</a></p></body></html>';
+    exit;
 }
 
 // GitHub zips extract to folders like "converta-cookie-banner-main" or
@@ -906,6 +1035,7 @@ add_action( 'load-update-core.php', 'pcc_force_update_check' );
 function pcc_force_update_check() {
     if ( isset( $_GET['force-check'] ) ) {
         delete_site_transient( 'pcc_github_version' );
+        delete_site_transient( 'pcc_github_tags' );
     }
 }
 
@@ -928,8 +1058,6 @@ function pcc_ajax_save_gh_token() {
     $token = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
     if ( '' === $token ) {
         delete_option( 'pcc_github_token' );
-    delete_option( 'pcc_company' );
-    delete_option( 'pcc_legal_pages' );
     } else {
         update_option( 'pcc_github_token', $token, false );
     }
@@ -2154,6 +2282,39 @@ function pcc_admin_design_page() {
                 <button type="button" class="button" id="pcc-save-gh-token">Save Token</button>
                 <span id="pcc-gh-token-msg"></span>
             </div>
+
+            <?php
+            // ---- One-click version switch / rollback ----
+            $pcc_tags     = pcc_get_github_tags();
+            $pcc_pin      = get_option( 'pcc_pin_version', '' );
+            $pcc_rb_base  = wp_nonce_url( admin_url( 'admin-post.php?action=pcc_rollback' ), 'pcc_rollback' );
+            ?>
+            <hr style="margin:16px 0;">
+            <p style="margin-bottom:6px;"><strong>Version switch / rollback</strong> &mdash; install any released version with one click. Settings and statistics are kept (they live in the database).</p>
+            <?php if ( $pcc_pin ) : ?>
+                <p style="color:#b45309;"><strong>Updates paused:</strong> pinned to version <?php echo esc_html( $pcc_pin ); ?>.
+                    <a class="button" href="<?php echo esc_url( $pcc_rb_base . '&version=latest' ); ?>">Resume updates (back to latest)</a>
+                </p>
+            <?php endif; ?>
+            <?php if ( $pcc_tags ) : ?>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <select id="pcc-rollback-version">
+                    <?php foreach ( $pcc_tags as $pcc_tag ) : ?>
+                        <option value="<?php echo esc_attr( $pcc_tag ); ?>"><?php echo esc_html( $pcc_tag . ( ltrim( $pcc_tag, 'vV' ) === PCC_VERSION ? ' (installed)' : '' ) ); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <a class="button" href="#" id="pcc-rollback-go">Install selected version</a>
+            </div>
+            <script>
+            document.getElementById('pcc-rollback-go').addEventListener('click', function(e){
+                var v = document.getElementById('pcc-rollback-version').value;
+                if (!confirm('Install version ' + v + '? Updates will be paused (pinned) until you resume them.')) { e.preventDefault(); return; }
+                this.href = '<?php echo esc_url_raw( $pcc_rb_base ); ?>' + '&version=' + encodeURIComponent(v);
+            });
+            </script>
+            <?php else : ?>
+                <p style="color:#666;">Version list unavailable right now (GitHub unreachable).</p>
+            <?php endif; ?>
             <script>
             (function(){
                 var btn = document.getElementById('pcc-save-gh-token');
@@ -2267,5 +2428,7 @@ function pcc_uninstall() {
     delete_option( 'pcc_github_token' );
     delete_option( 'pcc_company' );
     delete_option( 'pcc_legal_pages' );
+    delete_option( 'pcc_pin_version' );
     delete_site_transient( 'pcc_github_version' );
+    delete_site_transient( 'pcc_github_tags' );
 }
