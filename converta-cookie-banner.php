@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.4.1
+ * Version: 2.4.2
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.4.1' );
+define( 'PCC_VERSION', '2.4.2' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -1828,17 +1828,17 @@ function pcc_ajax_generate_legal() {
     if ( $lang && ! in_array( $lang, $site_lang, true ) ) {
         wp_send_json_error( 'Unknown language' );
     }
-    $is_default_lang = ! $lang || $lang === pcc_site_default_language();
-
     // 1) A page we generated before (even trashed): update / restore it.
-    $ours = ( $lang && ! $is_default_lang )
+    //    An explicit language ALWAYS uses its own per-language slot; the
+    //    main slot is only used by the language-less default button.
+    $ours = $lang
         ? pcc_get_generated_legal_page_lang( $type, $lang, true )
         : pcc_get_generated_legal_page( $type, true );
 
     // 2) Otherwise: if an existing page is found for this language, refuse
     //    to generate — select the existing page instead. No duplicates.
     if ( ! $ours ) {
-        $detected = ( $lang && ! $is_default_lang )
+        $detected = $lang
             ? pcc_resolve_legal_page( $type, $lang )
             : pcc_detect_legal_page( $type );
         if ( $detected && 'publish' !== get_post_status( $detected ) ) {
@@ -1849,7 +1849,7 @@ function pcc_ajax_generate_legal() {
             $detected = 0;
         }
         if ( $detected ) {
-            if ( $lang && ! $is_default_lang ) {
+            if ( $lang ) {
                 $legal['i18n'][ $type ][ $lang ] = $detected;
             } else {
                 $legal[ $type ] = $detected;
@@ -1931,14 +1931,19 @@ function pcc_ajax_generate_legal() {
         }
     }
 
-    if ( $lang && ! $is_default_lang ) {
+    if ( $lang ) {
         $legal['i18n'][ $type ][ $lang ] = $page_id;
+        // Keep the main slot too when this language IS the default and the
+        // main slot is empty.
+        if ( ! $legal[ $type ] && $lang === pcc_site_default_language() ) {
+            $legal[ $type ] = $page_id;
+        }
     } else {
         $legal[ $type ] = $page_id;
     }
     update_option( 'pcc_legal_pages', $legal, false );
 
-    if ( 'privacy' === $type && $is_default_lang && ! get_option( 'wp_page_for_privacy_policy' ) ) {
+    if ( 'privacy' === $type && ! $lang && ! get_option( 'wp_page_for_privacy_policy' ) ) {
         update_option( 'wp_page_for_privacy_policy', $page_id );
     }
 
