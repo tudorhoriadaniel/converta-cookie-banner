@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.4.0
+ * Version: 2.4.1
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.4.0' );
+define( 'PCC_VERSION', '2.4.1' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -1841,6 +1841,13 @@ function pcc_ajax_generate_legal() {
         $detected = ( $lang && ! $is_default_lang )
             ? pcc_resolve_legal_page( $type, $lang )
             : pcc_detect_legal_page( $type );
+        if ( $detected && 'publish' !== get_post_status( $detected ) ) {
+            // An unpublished draft (e.g. the Privacy Policy draft WordPress
+            // creates on install): adopt it — fill it with generated
+            // content and publish it, instead of refusing or duplicating.
+            $ours     = get_post( $detected );
+            $detected = 0;
+        }
         if ( $detected ) {
             if ( $lang && ! $is_default_lang ) {
                 $legal['i18n'][ $type ][ $lang ] = $detected;
@@ -1859,7 +1866,7 @@ function pcc_ajax_generate_legal() {
     }
 
     $company  = pcc_get_company();
-    $tpl_lang = $lang ?: '';
+    $tpl_lang = $lang ?: pcc_site_default_language();
     $content  = pcc_legal_template( $type, $company, $tpl_lang );
 
     if ( $ours ) {
@@ -1873,6 +1880,7 @@ function pcc_ajax_generate_legal() {
         ) );
         $page_id = $ours->ID;
         $action  = 'updated';
+        update_post_meta( $page_id, '_pcc_legal_type', $type );
     } else {
         $page_id = wp_insert_post( array(
             'post_type'    => 'page',
@@ -1895,11 +1903,31 @@ function pcc_ajax_generate_legal() {
         if ( function_exists( 'pll_set_post_language' ) ) {
             pll_set_post_language( $page_id, $effective_lang );
         }
-        $default_id = (int) ( $legal[ $type ] ?? 0 );
-        if ( $default_id && $default_id !== $page_id && function_exists( 'pll_save_post_translations' ) && function_exists( 'pll_get_post_translations' ) ) {
-            $translations = pll_get_post_translations( $default_id );
-            $translations[ $effective_lang ] = $page_id;
-            pll_save_post_translations( $translations );
+        if ( function_exists( 'pll_save_post_translations' ) && function_exists( 'pll_get_post_translations' ) && function_exists( 'pll_get_post_language' ) ) {
+            // Build the full translation map from everything we know, so
+            // linking works no matter which language was generated first.
+            $map = array( $effective_lang => $page_id );
+            $default_id = (int) ( $legal[ $type ] ?? 0 );
+            if ( $default_id && $default_id !== $page_id && 'trash' !== get_post_status( $default_id ) ) {
+                $dl = pll_get_post_language( $default_id );
+                if ( $dl && empty( $map[ $dl ] ) ) {
+                    $map[ $dl ] = $default_id;
+                }
+            }
+            foreach ( (array) ( $legal['i18n'][ $type ] ?? array() ) as $ml => $mid ) {
+                $mid = (int) $mid;
+                if ( $mid && empty( $map[ $ml ] ) && 'trash' !== get_post_status( $mid ) ) {
+                    $map[ $ml ] = $mid;
+                }
+            }
+            foreach ( $map as $anchor ) {
+                foreach ( (array) pll_get_post_translations( $anchor ) as $ml => $mid ) {
+                    if ( $mid && empty( $map[ $ml ] ) ) {
+                        $map[ $ml ] = (int) $mid;
+                    }
+                }
+            }
+            pll_save_post_translations( array_filter( $map ) );
         }
     }
 
@@ -1962,11 +1990,20 @@ function pcc_admin_legal_page() {
             </table>
         </div>
 
+        <?php
+        // Notices for other multilingual setups (only when Polylang absent).
+        if ( defined( 'ICL_SITEPRESS_VERSION' ) && ! function_exists( 'pll_languages_list' ) ) {
+            echo '<div class="notice notice-info inline" style="margin:0 0 16px;padding:10px 14px;"><strong>WPML detected:</strong> generate the default-language pages here, then create their translations with WPML&rsquo;s own translation tools.</div>';
+        } elseif ( ( class_exists( 'TRP_Translate_Press' ) || defined( 'WEGLOT_VERSION' ) ) && ! function_exists( 'pll_languages_list' ) ) {
+            echo '<div class="notice notice-info inline" style="margin:0 0 16px;padding:10px 14px;"><strong>Automatic translation plugin detected:</strong> one page per type is enough &mdash; it is translated on the fly for every language.</div>';
+        }
+        ?>
         <?php foreach ( $types as $type => $label ) :
             $selected = (int) $legal[ $type ];
             $detected = $selected ? 0 : pcc_detect_legal_page( $type );
             $current  = $selected ?: $detected;
             $is_ours  = $current && get_post_meta( $current, '_pcc_legal_type', true ) === $type;
+            $is_draft = $current && 'publish' !== get_post_status( $current );
         ?>
         <div class="pcc-design-section" style="margin-bottom:20px;">
             <h3><?php echo $label; // phpcs:ignore ?></h3>
@@ -1974,9 +2011,10 @@ function pcc_admin_legal_page() {
                 <p style="margin-top:0;">
                     <?php if ( $selected ) : ?>Selected page:<?php else : ?><strong>Existing page detected</strong> and pre-selected (save to confirm):<?php endif; ?>
                     <strong><?php echo esc_html( get_the_title( $current ) ); ?></strong>
+                    <?php echo $is_draft ? ' <span style="color:#b45309;">(draft &mdash; not published yet)</span>' : ''; ?>
                     &mdash; <a href="<?php echo esc_url( get_permalink( $current ) ); ?>" target="_blank" rel="noopener">view</a>
                     &middot; <a href="<?php echo esc_url( get_edit_post_link( $current, 'raw' ) ); ?>" target="_blank" rel="noopener">edit</a>
-                    <?php echo $is_ours ? ' <em>(generated by this plugin)</em>' : ' <em>(your existing page &mdash; the plugin will not touch it)</em>'; ?>
+                    <?php echo $is_ours ? ' <em>(generated by this plugin)</em>' : ( $is_draft ? ' <em>(unpublished draft &mdash; Generate will complete and publish it)</em>' : ' <em>(your existing page &mdash; the plugin will not touch it)</em>' ); ?>
                 </p>
             <?php else : ?>
                 <p style="margin-top:0;color:#b45309;"><strong>No page found on this site.</strong> You can generate one below from your company data.</p>
@@ -1991,10 +2029,10 @@ function pcc_admin_legal_page() {
                     'option_none_value' => '0',
                 ) ); ?>
                 </label>
-                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" data-lang="" <?php disabled( (bool) $current && ! $is_ours ); ?>>
-                    <?php echo $is_ours ? 'Regenerate content' : 'Generate page'; ?>
+                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" data-lang="" <?php disabled( (bool) $current && ! $is_ours && ! $is_draft ); ?>>
+                    <?php echo $is_ours ? 'Regenerate content' : ( $is_draft ? 'Complete &amp; publish draft' : 'Generate page' ); ?>
                 </button>
-                <?php if ( $current && ! $is_ours ) : ?>
+                <?php if ( $current && ! $is_ours && ! $is_draft ) : ?>
                     <span style="color:#666;">Generation is disabled because a page already exists &mdash; no duplicates.</span>
                 <?php endif; ?>
             </div>
@@ -2013,6 +2051,7 @@ function pcc_admin_legal_page() {
                     $is_def  = ( $pcc_l === $pcc_def );
                     $rid     = $is_def ? $current : pcc_resolve_legal_page( $type, $pcc_l );
                     $r_ours  = $rid && get_post_meta( $rid, '_pcc_legal_type', true ) === $type;
+                    $r_draft = $rid && 'publish' !== get_post_status( $rid );
                 ?>
                     <tr>
                         <td><strong><?php echo esc_html( strtoupper( $pcc_l ) ); ?></strong><?php echo $is_def ? ' <em>(default)</em>' : ''; ?></td>
@@ -2030,7 +2069,7 @@ function pcc_admin_legal_page() {
                             <?php if ( $is_def ) : ?>
                                 <span style="color:#666;">managed above</span>
                             <?php else : ?>
-                                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" data-lang="<?php echo esc_attr( $pcc_l ); ?>" <?php disabled( (bool) $rid && ! $r_ours ); ?>>
+                                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" data-lang="<?php echo esc_attr( $pcc_l ); ?>" <?php disabled( (bool) $rid && ! $r_ours && ! $r_draft ); ?>>
                                     <?php echo $r_ours ? 'Regenerate' : 'Generate (' . esc_html( strtoupper( $pcc_l ) ) . ')'; ?>
                                 </button>
                             <?php endif; ?>

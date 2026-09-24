@@ -2,7 +2,7 @@
 
 GDPR/ePrivacy cookie consent banner for WordPress with **Google Consent Mode v2**, a built-in cookie scanner, consent statistics dashboard, full design customizer, and translations in 6 languages.
 
-**Version:** 2.4.0 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
+**Version:** 2.4.1 · **License:** GPL v2 or later · **Author:** [Converta](https://converta.ro)
 
 ## Features
 
@@ -56,6 +56,9 @@ Verify with [Google Tag Assistant](https://tagassistant.google.com/): **Consent 
 - Uninstalling the plugin drops the log table and deletes all plugin options.
 
 ## Changelog
+
+### 2.4.1
+- Works correctly in every setup when the legal pages don't exist yet: unpublished drafts (like the Privacy Policy draft WordPress auto-creates on install) are adopted — Generate completes and publishes them instead of refusing; Polylang translation linking works in any generation order; the default-language template follows Polylang's default language; clear guidance shown for WPML and on-the-fly translators (TranslatePress/Weglot)
 
 ### 2.4.0
 - **Multilingual legal pages (Polylang):** each language gets its own Privacy/Terms page — a per-language table on the Legal Pages screen shows what exists and offers Generate only for missing languages; generated translations are linked automatically as Polylang translations, and the footer links point to the version in the visitor's language
