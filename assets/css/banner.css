@@ -589,6 +589,22 @@ button#pcc-reopen.pcc-reopen-btn svg {
     box-sizing: border-box;
 }
 
+.pcc-footer-bar a.pcc-legal-link {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 14px;
+    color: var(--pcc-text, #7b8da6) !important;
+    text-decoration: underline !important;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    opacity: 0.9;
+}
+
+.pcc-footer-bar a.pcc-legal-link:hover {
+    opacity: 1;
+    color: var(--pcc-teal, #3bb8a0) !important;
+}
+
 .pcc-footer-bar a.pcc-plink {
     display: inline-flex !important;
     align-items: center;

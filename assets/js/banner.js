@@ -173,8 +173,10 @@
     function placeFooterLink() {
         var bar = document.querySelector('.pcc-footer-bar');
         if (!bar) return;
-        var link = bar.querySelector('a.pcc-plink');
-        if (!link) return;
+        // All links in the bar: legal-page links (only for pages generated
+        // by the plugin) followed by the cookie-settings link.
+        var links = Array.prototype.slice.call(bar.querySelectorAll('a'));
+        if (!links.length) return;
 
         // If a consent link was already placed manually (menu item with the
         // pcc-plink class, shortcode, widget), don't add another one —
@@ -186,6 +188,8 @@
                 return;
             }
         }
+
+        function done() { bar.parentNode.removeChild(bar); }
 
         // 1) Footer menus (bottom-bar menus usually come last in the DOM,
         //    so pick the LAST match to avoid widget-column menus).
@@ -200,23 +204,26 @@
             var lists = document.querySelectorAll(menuSelectors[i]);
             if (!lists.length) continue;
             var menu = lists[lists.length - 1];
-            var li = document.createElement('li');
-            li.className = 'pcc-menu-item';
             // Borrow the class of a sibling item so theme menu styles apply
+            var itemClass = 'pcc-menu-item';
             var sibling = menu.querySelector('li');
             if (sibling && sibling.className) {
-                li.className = sibling.className
+                itemClass = sibling.className
                     .replace(/\bcurrent[-_\w]*\b/g, '')
                     .replace(/\bactive\b/g, '')
                     .trim() + ' pcc-menu-item';
             }
-            li.appendChild(link);
-            menu.appendChild(li);
-            bar.parentNode.removeChild(bar);
+            links.forEach(function (l) {
+                var li = document.createElement('li');
+                li.className = itemClass;
+                li.appendChild(l);
+                menu.appendChild(li);
+            });
+            done();
             return;
         }
 
-        // 2) Copyright / site-info rows — append inline with a separator.
+        // 2) Copyright / site-info rows — append inline with separators.
         var inlineSelectors = [
             'footer .site-info', '.site-footer .site-info',
             'footer .copyright', '.site-footer .copyright',
@@ -226,18 +233,20 @@
         for (var j = 0; j < inlineSelectors.length; j++) {
             var row = document.querySelector(inlineSelectors[j]);
             if (!row) continue;
-            var sep = document.createElement('span');
-            sep.className = 'pcc-sep';
-            sep.textContent = ' · ';
-            row.appendChild(sep);
-            row.appendChild(link);
-            bar.parentNode.removeChild(bar);
+            links.forEach(function (l) {
+                var sep = document.createElement('span');
+                sep.className = 'pcc-sep';
+                sep.textContent = ' · ';
+                row.appendChild(sep);
+                row.appendChild(l);
+            });
+            done();
             return;
         }
 
         // 3) Universal fallback for custom/hand-coded footers: insert right
         //    after the LAST link inside the page's last <footer> element, so
-        //    it sits with the theme's own footer links and inherits their
+        //    they sit with the theme's own footer links and inherit their
         //    styling (works with flex/gap rows, plain divs, anything).
         var footers = document.querySelectorAll('footer');
         if (footers.length) {
@@ -246,8 +255,12 @@
             if (anchors.length) {
                 var lastA = anchors[anchors.length - 1];
                 if (lastA.parentNode && !bar.contains(lastA)) {
-                    lastA.parentNode.insertBefore(link, lastA.nextSibling);
-                    bar.parentNode.removeChild(bar);
+                    var after = lastA;
+                    links.forEach(function (l) {
+                        after.parentNode.insertBefore(l, after.nextSibling);
+                        after = l;
+                    });
+                    done();
                     return;
                 }
             }
