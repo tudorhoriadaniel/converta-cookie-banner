@@ -342,6 +342,15 @@
             pendingShow = false;
             showBanner();
         }
+
+        // Demo helper (used for documentation screenshots and client
+        // demos): ?pcc_demo=1 forces the banner open, ?pcc_demo=prefs
+        // opens the preferences panel.
+        var demo = (window.location.search.match(/[?&]pcc_demo=([^&]+)/) || [])[1];
+        if (demo) {
+            showBanner();
+            if ('prefs' === demo) showPreferences();
+        }
     }
 
     // ---- Fetch the banner markup and inject it ----

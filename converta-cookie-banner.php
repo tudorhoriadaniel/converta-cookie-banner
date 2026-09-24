@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.2.0
+ * Version: 2.3.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.2.0' );
+define( 'PCC_VERSION', '2.3.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -889,6 +889,14 @@ function pcc_github_update_info( $update, $plugin_data, $plugin_file ) {
         'version' => $remote,
         'url'     => 'https://github.com/' . PCC_GITHUB_REPO,
         'package' => $package,
+        'icons'   => array(
+            '1x' => pcc_wp_assets_url() . 'icon-128x128.png',
+            '2x' => pcc_wp_assets_url() . 'icon-256x256.png',
+        ),
+        'banners' => array(
+            'low'  => pcc_wp_assets_url() . 'banner-772x250.png',
+            'high' => pcc_wp_assets_url() . 'banner-1544x500.png',
+        ),
     );
 }
 
@@ -1015,27 +1023,108 @@ function pcc_md_inline( $text ) {
  */
 add_filter( 'plugins_api', 'pcc_plugins_api_info', 10, 3 );
 
+function pcc_wp_assets_url() {
+    return 'https://raw.githubusercontent.com/' . PCC_GITHUB_REPO . '/main/assets/wp/';
+}
+
+/**
+ * Date of the latest commit on main (cached 6 hours).
+ */
+function pcc_get_last_updated() {
+    $cached = get_site_transient( 'pcc_github_updated' );
+    if ( $cached ) {
+        return $cached;
+    }
+    $resp = wp_remote_get(
+        'https://api.github.com/repos/' . PCC_GITHUB_REPO . '/commits/main',
+        array( 'timeout' => 10, 'headers' => array( 'Accept' => 'application/vnd.github+json' ) )
+    );
+    if ( is_wp_error( $resp ) || 200 !== wp_remote_retrieve_response_code( $resp ) ) {
+        return '';
+    }
+    $data = json_decode( wp_remote_retrieve_body( $resp ), true );
+    $date = $data['commit']['committer']['date'] ?? '';
+    if ( $date ) {
+        $date = gmdate( 'Y-m-d', strtotime( $date ) );
+        set_site_transient( 'pcc_github_updated', $date, 6 * HOUR_IN_SECONDS );
+    }
+    return $date;
+}
+
 function pcc_plugins_api_info( $res, $action, $args ) {
     if ( 'plugin_information' !== $action || empty( $args->slug ) || dirname( plugin_basename( __FILE__ ) ) !== $args->slug ) {
         return $res;
     }
+
+    $assets = pcc_wp_assets_url();
 
     $changelog = '';
     foreach ( pcc_get_changelog_map() as $version => $entry ) {
         $changelog .= '<h4>' . esc_html( $version ) . '</h4>' . $entry['html'];
     }
 
+    $description = '<p><strong>Converta Cookie Banner</strong> is a complete GDPR/ePrivacy consent solution built around Google Consent Mode v2 — engineered so that the consent default always fires before Google Tag Manager, no matter how GTM is installed.</p>'
+        . '<h4>Highlights</h4><ul>'
+        . '<li><strong>Google Consent Mode v2</strong> — consent default injected as the very first script in <code>&lt;head&gt;</code>; optional hard-block mode for GTM.</li>'
+        . '<li><strong>Ad-blocker resistant</strong> — inline assets and neutral markup survive Brave/uBlock cookie-notice filters, so consent can always be given.</li>'
+        . '<li><strong>SEO-clean</strong> — zero banner text in the page HTML (loaded via AJAX, <code>data-nosnippet</code> everywhere).</li>'
+        . '<li><strong>Cookie scanner</strong> — crawls the site, detects cookies, one-click cookie library.</li>'
+        . '<li><strong>Consent statistics</strong> — accept/reject rates, unique visitors, daily trends (privacy-safe, hashed).</li>'
+        . '<li><strong>Legal Pages</strong> — detects existing Privacy/Terms pages (never duplicates) or generates them from company data.</li>'
+        . '<li><strong>Design customizer &amp; 6 languages</strong> — every color and text, RO/EN/DE/FR/IT/ES with automatic detection.</li>'
+        . '<li><strong>Self-updates from GitHub</strong> — native WordPress updates, one-click rollback to any version.</li>'
+        . '</ul>';
+
+    $installation = '<ol>'
+        . '<li>Upload the plugin ZIP via <strong>Plugins &rarr; Add New &rarr; Upload Plugin</strong> and activate it.</li>'
+        . '<li>The banner appears immediately for visitors without a consent cookie.</li>'
+        . '<li>Configure everything under the <strong>Cookie Consent</strong> admin menu: Statistics, Cookie Scanner, Banner Design, Translations, Legal Pages.</li>'
+        . '<li>From then on the plugin updates itself from GitHub — no more manual uploads.</li>'
+        . '</ol>';
+
+    $faq = '<h4>How do visitors change their consent later?</h4><p>Via the floating cookie icon, an automatic footer link, the <code>[pcc_consent_link]</code> shortcode, or any link with the <code>pcc-plink</code> CSS class — configurable in Banner Design.</p>'
+        . '<h4>Does it block Google Tag Manager?</h4><p>No — by default it uses Advanced Consent Mode: GTM loads immediately and consent signals keep Google tags cookieless until consent. An optional Basic mode hard-blocks GTM until consent is granted.</p>'
+        . '<h4>Will it duplicate my Privacy Policy / Terms pages?</h4><p>Never. The Legal Pages section detects existing pages and selects them; generation is only offered when no page exists.</p>'
+        . '<h4>Do updates or rollbacks lose my settings and statistics?</h4><p>No — settings and consent logs live in the database and survive updates, rollbacks and deactivation. Only deleting the plugin removes them.</p>'
+        . '<h4>How do I install an older version?</h4><p>Banner Design &rarr; Plugin Updates from GitHub &rarr; Version switch: pick any released version and install it with one click. Updates pause on that version until you resume them.</p>';
+
+    $screenshots = '<ol>'
+        . '<li><a href="' . esc_url( $assets . 'screenshot-1.png' ) . '"><img src="' . esc_url( $assets . 'screenshot-1.png' ) . '" alt="Consent banner"></a><p>The consent banner on a live site (dark theme, fully customizable).</p></li>'
+        . '<li><a href="' . esc_url( $assets . 'screenshot-2.png' ) . '"><img src="' . esc_url( $assets . 'screenshot-2.png' ) . '" alt="Preferences panel"></a><p>The preferences panel with per-category toggles and cookie tables.</p></li>'
+        . '</ol>';
+
     return (object) array(
         'name'          => 'Converta Cookie Banner',
         'slug'          => $args->slug,
         'version'       => pcc_get_remote_version() ?: PCC_VERSION,
         'author'        => '<a href="https://converta.ro">Converta</a>',
+        'author_profile' => 'https://converta.ro',
         'homepage'      => 'https://github.com/' . PCC_GITHUB_REPO,
         'requires'      => '5.8',
+        'tested'        => get_bloginfo( 'version' ),
         'requires_php'  => '7.4',
+        'last_updated'  => pcc_get_last_updated(),
+        'banners'       => array(
+            'low'  => $assets . 'banner-772x250.png',
+            'high' => $assets . 'banner-1544x500.png',
+        ),
+        'icons'         => array(
+            '1x' => $assets . 'icon-128x128.png',
+            '2x' => $assets . 'icon-256x256.png',
+        ),
+        'contributors'  => array(
+            'converta' => array(
+                'profile'      => 'https://converta.ro',
+                'avatar'       => $assets . 'icon-128x128.png',
+                'display_name' => 'Converta',
+            ),
+        ),
         'sections'      => array(
-            'description' => '<p>GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, consent statistics, legal pages management and self-updates from GitHub.</p>',
-            'changelog'   => $changelog ?: '<p>See the repository for details.</p>',
+            'description'  => $description,
+            'installation' => $installation,
+            'faq'          => $faq,
+            'screenshots'  => $screenshots,
+            'changelog'    => $changelog ?: '<p>See the repository for details.</p>',
         ),
         'download_link' => 'https://github.com/' . PCC_GITHUB_REPO . '/archive/refs/heads/main.zip',
     );
