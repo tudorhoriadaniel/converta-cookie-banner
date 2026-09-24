@@ -277,7 +277,7 @@ Golește cache-ul paginilor (plugin de cache/CDN). Verifică apoi în incognito.
 **Bannerul nu apare în Brave / cu uBlock**
 De la v1.7.0 pluginul este imun la filtrele standard. Dacă totuși dispare, vizitatorul are liste de filtre agresive personalizate; verifică cu shields dezactivat pentru confirmare și raportează.
 
-**„GTM-PBLB2T7 is not enabled for debugging" în Tag Assistant**
+**„GTM-XXXX is not enabled for debugging" în Tag Assistant**
 Nu e o blocare — pornește sesiunea de debug din GTM (tagmanager.google.com → containerul tău → **Preview**), nu direct din tagassistant.google.com.
 
 **Linkuri „duplicate" către paginile legale în footer**
