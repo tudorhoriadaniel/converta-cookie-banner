@@ -3,7 +3,7 @@
  * Plugin Name: Converta Cookie Banner
  * Plugin URI: https://converta.ro
  * Description: GDPR/ePrivacy cookie consent banner with Google Consent Mode v2, cookie scanner, and admin stats dashboard.
- * Version: 2.3.1
+ * Version: 2.4.0
  * Author: Converta
  * Author URI: https://converta.ro
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'PCC_VERSION', '2.3.1' );
+define( 'PCC_VERSION', '2.4.0' );
 define( 'PCC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PCC_COOKIE_NAME', 'procab_cookie_consent' );
@@ -1492,8 +1492,17 @@ function pcc_render_banner( $path_override = null, $lang_override = null ) {
 $pcc_legal       = pcc_get_legal_settings();
 $pcc_legal_links = array();
 if ( ! empty( $pcc_legal['footer_links'] ) ) {
+    $pcc_cur_lang = pcc_detect_language( $path_override, $lang_override );
     foreach ( array( 'privacy', 'terms' ) as $pcc_lt ) {
         $pcc_lp = (int) ( $pcc_legal[ $pcc_lt ] ?? 0 );
+        // On multilingual sites, link the version in the visitor's language.
+        $pcc_tr = (int) ( $pcc_legal['i18n'][ $pcc_lt ][ $pcc_cur_lang ] ?? 0 );
+        if ( ! $pcc_tr && $pcc_lp && function_exists( 'pll_get_post' ) ) {
+            $pcc_tr = (int) pll_get_post( $pcc_lp, $pcc_cur_lang );
+        }
+        if ( $pcc_tr ) {
+            $pcc_lp = $pcc_tr;
+        }
         if ( $pcc_lp && 'publish' === get_post_status( $pcc_lp ) && get_post_meta( $pcc_lp, '_pcc_legal_type', true ) === $pcc_lt ) {
             $pcc_legal_links[] = array( get_permalink( $pcc_lp ), get_the_title( $pcc_lp ) );
         }
@@ -1551,7 +1560,68 @@ function pcc_get_legal_settings() {
         'privacy'      => 0,
         'terms'        => 0,
         'footer_links' => 1,
+        // Per-language page ids on multilingual (Polylang) sites:
+        // array( 'privacy' => array( 'en' => 12 ), 'terms' => array( ... ) )
+        'i18n'         => array(),
     ) );
+}
+
+// ---- Multilingual (Polylang) support ----
+
+function pcc_site_languages() {
+    return function_exists( 'pll_languages_list' ) ? (array) pll_languages_list( array( 'fields' => 'slug' ) ) : array();
+}
+
+function pcc_site_default_language() {
+    return function_exists( 'pll_default_language' ) ? (string) pll_default_language( 'slug' ) : '';
+}
+
+/**
+ * A page this plugin generated for a given type AND language.
+ */
+function pcc_get_generated_legal_page_lang( $type, $lang, $include_trash = false ) {
+    $statuses = array( 'publish', 'draft', 'private', 'pending' );
+    if ( $include_trash ) {
+        $statuses[] = 'trash';
+    }
+    $posts = get_posts( array(
+        'post_type'   => 'page',
+        'post_status' => $statuses,
+        'meta_query'  => array(
+            array( 'key' => '_pcc_legal_type', 'value' => $type ),
+            array( 'key' => '_pcc_legal_lang', 'value' => $lang ),
+        ),
+        'numberposts' => 1,
+        'orderby'     => 'ID',
+        'order'       => 'ASC',
+        'lang'        => '', // Polylang: do not filter by admin language
+    ) );
+    return $posts ? $posts[0] : null;
+}
+
+/**
+ * The page to use for a type in a specific language, or 0.
+ * Order: explicit per-language selection → Polylang translation of the
+ * default-language page → a page this plugin generated for that language.
+ */
+function pcc_resolve_legal_page( $type, $lang ) {
+    $legal = pcc_get_legal_settings();
+
+    $sel = (int) ( $legal['i18n'][ $type ][ $lang ] ?? 0 );
+    if ( $sel && get_post( $sel ) && 'trash' !== get_post_status( $sel ) ) {
+        return $sel;
+    }
+
+    $default_id = (int) ( $legal[ $type ] ?? 0 );
+    if ( $default_id && function_exists( 'pll_get_post' ) ) {
+        $t = pll_get_post( $default_id, $lang );
+        if ( $t && 'trash' !== get_post_status( $t ) ) {
+            return (int) $t;
+        }
+    }
+
+    $generated = pcc_get_generated_legal_page_lang( $type, $lang );
+    return $generated ? $generated->ID : 0;
 }
 
 /**
@@ -1635,39 +1705,64 @@ function pcc_detect_legal_page( $type ) {
  * Build the page content from company data. Romanian and English
  * templates; other site languages fall back to English.
  */
-function pcc_legal_template( $type, $c ) {
-    $lang    = strtolower( substr( get_locale(), 0, 2 ) );
-    $name    = $c['company_name'] ?: '[numele companiei]';
-    $legal   = $name;
-    $cui     = $c['cui'] ?: '[CUI]';
-    $regcom  = $c['reg_com'] ?: '';
-    $address = $c['address'] ?: '[adresa]';
-    $email   = $c['email'] ?: '[email]';
-    $phone   = $c['phone'] ?: '';
+function pcc_legal_template( $type, $c, $lang = '' ) {
+    $lang    = $lang ?: strtolower( substr( get_locale(), 0, 2 ) );
+    $name    = $c['company_name'] ?: get_bloginfo( 'name' );
+    $cui     = $c['cui'];
+    $regcom  = $c['reg_com'];
+    $address = $c['address'];
+    $email   = $c['email'];
+    $phone   = $c['phone'];
     $site    = $c['website'] ?: home_url();
     $host    = wp_parse_url( $site, PHP_URL_HOST );
     $date    = date_i18n( get_option( 'date_format' ) );
 
-    $id_line_ro = $legal . ', CUI ' . $cui . ( $regcom ? ', Nr. Reg. Com. ' . $regcom : '' ) . ', cu sediul în ' . $address;
-    $id_line_en = $legal . ', tax ID ' . $cui . ( $regcom ? ', trade registry no. ' . $regcom : '' ) . ', registered at ' . $address;
-    $contact_ro = 'Email: ' . $email . ( $phone ? ' · Telefon: ' . $phone : '' );
-    $contact_en = 'Email: ' . $email . ( $phone ? ' · Phone: ' . $phone : '' );
+    // Identity/contact lines are built ONLY from fields that have a value —
+    // empty fields are omitted entirely (no "[CUI]"-style placeholders).
+    $parts_ro = array( $name );
+    $parts_en = array( $name );
+    if ( $cui ) {
+        $parts_ro[] = 'CUI ' . $cui;
+        $parts_en[] = 'tax ID ' . $cui;
+    }
+    if ( $regcom ) {
+        $parts_ro[] = 'Nr. Reg. Com. ' . $regcom;
+        $parts_en[] = 'trade registry no. ' . $regcom;
+    }
+    $id_line_ro = implode( ', ', $parts_ro ) . ( $address ? ', cu sediul în ' . $address : '' );
+    $id_line_en = implode( ', ', $parts_en ) . ( $address ? ', registered at ' . $address : '' );
+
+    $cparts_ro = array();
+    $cparts_en = array();
+    if ( $email ) {
+        $cparts_ro[] = 'Email: ' . $email;
+        $cparts_en[] = 'Email: ' . $email;
+    }
+    if ( $phone ) {
+        $cparts_ro[] = 'Telefon: ' . $phone;
+        $cparts_en[] = 'Phone: ' . $phone;
+    }
+    $contact_ro = $cparts_ro ? ' ' . implode( ' · ', $cparts_ro ) . '.' : '';
+    $contact_en = $cparts_en ? ' ' . implode( ' · ', $cparts_en ) . '.' : '';
+
+    $rights_ro = $email ? "scrieți-ne la {$email}" : 'contactați-ne folosind datele publicate pe site';
+    $rights_en = $email ? "write to {$email}" : 'contact us using the details published on this website';
 
     if ( 'ro' === $lang ) {
         if ( 'privacy' === $type ) {
-            return "<h2>1. Cine suntem</h2>\n<p>Site-ul <strong>{$host}</strong> este operat de <strong>{$id_line_ro}</strong> (denumit în continuare „{$name}”). {$contact_ro}.</p>\n<h2>2. Ce date colectăm</h2>\n<p>Colectăm datele pe care ni le furnizați direct (de exemplu prin formularele de contact: nume, adresă de email, număr de telefon, conținutul mesajului) și date colectate automat prin cookie-uri și tehnologii similare (adresă IP, tip de browser, pagini vizitate, durata vizitei), în funcție de consimțământul dumneavoastră.</p>\n<h2>3. Scopurile și temeiurile prelucrării</h2>\n<p>Prelucrăm datele pentru: (a) a răspunde solicitărilor dumneavoastră — temei: demersuri precontractuale sau interes legitim; (b) analiza traficului și îmbunătățirea site-ului — temei: consimțământ; (c) marketing și publicitate personalizată — temei: consimțământ; (d) îndeplinirea obligațiilor legale.</p>\n<h2>4. Cookie-uri</h2>\n<p>Site-ul folosește cookie-uri necesare (esențiale pentru funcționare), de statistică și de marketing. Cookie-urile de statistică și marketing se activează doar cu consimțământul dumneavoastră, exprimat prin bannerul de consimțământ. Puteți modifica oricând alegerea de aici: [pcc_consent_link]. Lista completă a cookie-urilor folosite este disponibilă în panoul de preferințe al bannerului.</p>\n<h2>5. Destinatarii datelor</h2>\n<p>Datele pot fi transmise către furnizori de servicii (găzduire web, servicii de analiză precum Google Analytics, platforme de publicitate) care acționează ca persoane împuternicite, precum și autorităților publice atunci când legea o impune. Unii furnizori (de exemplu Google) pot transfera date în afara SEE, cu garanții adecvate (clauze contractuale standard).</p>\n<h2>6. Durata stocării</h2>\n<p>Păstrăm datele doar cât este necesar scopurilor de mai sus: datele din formulare — până la soluționarea solicitării și maximum 3 ani; datele de consimțământ pentru cookie-uri — 12 luni; datele de analiză — conform setărilor serviciului de analiză.</p>\n<h2>7. Drepturile dumneavoastră</h2>\n<p>Conform GDPR, aveți dreptul de acces, rectificare, ștergere, restricționare, portabilitate, opoziție și dreptul de a vă retrage oricând consimțământul, fără a afecta legalitatea prelucrării anterioare. Pentru exercitarea drepturilor, scrieți-ne la {$email}. Aveți de asemenea dreptul de a depune o plângere la ANSPDCP (www.dataprotection.ro).</p>\n<h2>8. Securitate</h2>\n<p>Aplicăm măsuri tehnice și organizatorice adecvate pentru protejarea datelor (conexiuni criptate HTTPS, acces restricționat, actualizări de securitate).</p>\n<h2>9. Actualizări</h2>\n<p>Prezenta politică poate fi actualizată periodic; versiunea curentă este publicată pe această pagină. Ultima actualizare: {$date}.</p>\n<p><em>Acest document este un șablon generat automat pe baza datelor companiei și nu constituie consultanță juridică. Recomandăm revizuirea lui de către un specialist.</em></p>";
+            return "<h2>1. Cine suntem</h2>\n<p>Site-ul <strong>{$host}</strong> este operat de <strong>{$id_line_ro}</strong> (denumit în continuare „{$name}”).{$contact_ro}</p>\n<h2>2. Ce date colectăm</h2>\n<p>Colectăm datele pe care ni le furnizați direct (de exemplu prin formularele de contact: nume, adresă de email, număr de telefon, conținutul mesajului) și date colectate automat prin cookie-uri și tehnologii similare (adresă IP, tip de browser, pagini vizitate, durata vizitei), în funcție de consimțământul dumneavoastră.</p>\n<h2>3. Scopurile și temeiurile prelucrării</h2>\n<p>Prelucrăm datele pentru: (a) a răspunde solicitărilor dumneavoastră — temei: demersuri precontractuale sau interes legitim; (b) analiza traficului și îmbunătățirea site-ului — temei: consimțământ; (c) marketing și publicitate personalizată — temei: consimțământ; (d) îndeplinirea obligațiilor legale.</p>\n<h2>4. Cookie-uri</h2>\n<p>Site-ul folosește cookie-uri necesare (esențiale pentru funcționare), de statistică și de marketing. Cookie-urile de statistică și marketing se activează doar cu consimțământul dumneavoastră, exprimat prin bannerul de consimțământ. Puteți modifica oricând alegerea de aici: [pcc_consent_link]. Lista completă a cookie-urilor folosite este disponibilă în panoul de preferințe al bannerului.</p>\n<h2>5. Destinatarii datelor</h2>\n<p>Datele pot fi transmise către furnizori de servicii (găzduire web, servicii de analiză precum Google Analytics, platforme de publicitate) care acționează ca persoane împuternicite, precum și autorităților publice atunci când legea o impune. Unii furnizori (de exemplu Google) pot transfera date în afara SEE, cu garanții adecvate (clauze contractuale standard).</p>\n<h2>6. Durata stocării</h2>\n<p>Păstrăm datele doar cât este necesar scopurilor de mai sus: datele din formulare — până la soluționarea solicitării și maximum 3 ani; datele de consimțământ pentru cookie-uri — 12 luni; datele de analiză — conform setărilor serviciului de analiză.</p>\n<h2>7. Drepturile dumneavoastră</h2>\n<p>Conform GDPR, aveți dreptul de acces, rectificare, ștergere, restricționare, portabilitate, opoziție și dreptul de a vă retrage oricând consimțământul, fără a afecta legalitatea prelucrării anterioare. Pentru exercitarea drepturilor, {$rights_ro}. Aveți de asemenea dreptul de a depune o plângere la ANSPDCP (www.dataprotection.ro).</p>\n<h2>8. Securitate</h2>\n<p>Aplicăm măsuri tehnice și organizatorice adecvate pentru protejarea datelor (conexiuni criptate HTTPS, acces restricționat, actualizări de securitate).</p>\n<h2>9. Actualizări</h2>\n<p>Prezenta politică poate fi actualizată periodic; versiunea curentă este publicată pe această pagină. Ultima actualizare: {$date}.</p>\n<p><em>Acest document este un șablon generat automat pe baza datelor companiei și nu constituie consultanță juridică. Recomandăm revizuirea lui de către un specialist.</em></p>";
         }
-        return "<h2>1. Informații generale</h2>\n<p>Site-ul <strong>{$host}</strong> este operat de <strong>{$id_line_ro}</strong> (denumit în continuare „{$name}”). {$contact_ro}.</p>\n<h2>2. Acceptarea termenilor</h2>\n<p>Accesarea și utilizarea site-ului implică acceptarea prezentelor termeni și condiții. Dacă nu sunteți de acord, vă rugăm să nu utilizați site-ul.</p>\n<h2>3. Conținutul site-ului</h2>\n<p>Conținutul site-ului (texte, imagini, elemente grafice, logo-uri) este proprietatea {$name} sau a partenerilor săi și este protejat de legislația privind drepturile de autor. Reproducerea fără acord scris este interzisă.</p>\n<h2>4. Utilizarea site-ului</h2>\n<p>Vă obligați să utilizați site-ul în conformitate cu legea și cu bunele practici, fără a afecta funcționarea acestuia, fără a accesa neautorizat sisteme sau date și fără a transmite conținut ilegal sau dăunător.</p>\n<h2>5. Servicii și informații</h2>\n<p>Informațiile publicate au caracter informativ. {$name} depune eforturi rezonabile pentru acuratețea lor, însă nu garantează caracterul complet sau actual al acestora și își rezervă dreptul de a modifica conținutul fără notificare prealabilă.</p>\n<h2>6. Limitarea răspunderii</h2>\n<p>{$name} nu răspunde pentru daune directe sau indirecte rezultate din utilizarea site-ului, din imposibilitatea utilizării acestuia sau din acțiunile unor terți (inclusiv site-uri către care există linkuri).</p>\n<h2>7. Protecția datelor</h2>\n<p>Prelucrarea datelor cu caracter personal este descrisă în Politica de Confidențialitate, iar utilizarea cookie-urilor poate fi gestionată oricând de aici: [pcc_consent_link].</p>\n<h2>8. Legea aplicabilă și litigii</h2>\n<p>Prezentele termeni sunt guvernate de legea română. Litigiile se soluționează pe cale amiabilă, iar în caz contrar de instanțele competente. Consumatorii pot apela și la platforma europeană de soluționare online a litigiilor (ec.europa.eu/consumers/odr) sau la ANPC (anpc.ro).</p>\n<h2>9. Modificarea termenilor</h2>\n<p>{$name} poate modifica acești termeni; versiunea curentă este publicată pe această pagină. Ultima actualizare: {$date}.</p>\n<p><em>Acest document este un șablon generat automat pe baza datelor companiei și nu constituie consultanță juridică. Recomandăm revizuirea lui de către un specialist.</em></p>";
+        return "<h2>1. Informații generale</h2>\n<p>Site-ul <strong>{$host}</strong> este operat de <strong>{$id_line_ro}</strong> (denumit în continuare „{$name}”).{$contact_ro}</p>\n<h2>2. Acceptarea termenilor</h2>\n<p>Accesarea și utilizarea site-ului implică acceptarea prezentelor termeni și condiții. Dacă nu sunteți de acord, vă rugăm să nu utilizați site-ul.</p>\n<h2>3. Conținutul site-ului</h2>\n<p>Conținutul site-ului (texte, imagini, elemente grafice, logo-uri) este proprietatea {$name} sau a partenerilor săi și este protejat de legislația privind drepturile de autor. Reproducerea fără acord scris este interzisă.</p>\n<h2>4. Utilizarea site-ului</h2>\n<p>Vă obligați să utilizați site-ul în conformitate cu legea și cu bunele practici, fără a afecta funcționarea acestuia, fără a accesa neautorizat sisteme sau date și fără a transmite conținut ilegal sau dăunător.</p>\n<h2>5. Servicii și informații</h2>\n<p>Informațiile publicate au caracter informativ. {$name} depune eforturi rezonabile pentru acuratețea lor, însă nu garantează caracterul complet sau actual al acestora și își rezervă dreptul de a modifica conținutul fără notificare prealabilă.</p>\n<h2>6. Limitarea răspunderii</h2>\n<p>{$name} nu răspunde pentru daune directe sau indirecte rezultate din utilizarea site-ului, din imposibilitatea utilizării acestuia sau din acțiunile unor terți (inclusiv site-uri către care există linkuri).</p>\n<h2>7. Protecția datelor</h2>\n<p>Prelucrarea datelor cu caracter personal este descrisă în Politica de Confidențialitate, iar utilizarea cookie-urilor poate fi gestionată oricând de aici: [pcc_consent_link].</p>\n<h2>8. Legea aplicabilă și litigii</h2>\n<p>Prezentele termeni sunt guvernate de legea română. Litigiile se soluționează pe cale amiabilă, iar în caz contrar de instanțele competente. Consumatorii pot apela și la platforma europeană de soluționare online a litigiilor (ec.europa.eu/consumers/odr) sau la ANPC (anpc.ro).</p>\n<h2>9. Modificarea termenilor</h2>\n<p>{$name} poate modifica acești termeni; versiunea curentă este publicată pe această pagină. Ultima actualizare: {$date}.</p>\n<p><em>Acest document este un șablon generat automat pe baza datelor companiei și nu constituie consultanță juridică. Recomandăm revizuirea lui de către un specialist.</em></p>";
     }
 
     if ( 'privacy' === $type ) {
-        return "<h2>1. Who we are</h2>\n<p><strong>{$host}</strong> is operated by <strong>{$id_line_en}</strong> (\"{$name}\"). {$contact_en}.</p>\n<h2>2. Data we collect</h2>\n<p>We collect data you provide directly (e.g. via contact forms: name, email address, phone number, message content) and data collected automatically through cookies and similar technologies (IP address, browser type, pages visited, visit duration), subject to your consent.</p>\n<h2>3. Purposes and legal bases</h2>\n<p>We process data to: (a) respond to your requests — legal basis: pre-contractual steps or legitimate interest; (b) analyze traffic and improve the website — legal basis: consent; (c) marketing and personalized advertising — legal basis: consent; (d) comply with legal obligations.</p>\n<h2>4. Cookies</h2>\n<p>This website uses necessary cookies (essential for operation), statistics cookies and marketing cookies. Statistics and marketing cookies are activated only with your consent, given through the consent banner. You can change your choice at any time here: [pcc_consent_link]. The full list of cookies is available in the banner's preferences panel.</p>\n<h2>5. Data recipients</h2>\n<p>Data may be shared with service providers (web hosting, analytics services such as Google Analytics, advertising platforms) acting as processors, and with public authorities where required by law. Some providers (e.g. Google) may transfer data outside the EEA with appropriate safeguards (standard contractual clauses).</p>\n<h2>6. Retention</h2>\n<p>We keep data only as long as necessary for the purposes above: form data — until the request is resolved and at most 3 years; cookie consent records — 12 months; analytics data — according to the analytics service settings.</p>\n<h2>7. Your rights</h2>\n<p>Under the GDPR you have the rights of access, rectification, erasure, restriction, portability, objection, and the right to withdraw consent at any time without affecting prior processing. To exercise your rights, write to {$email}. You may also lodge a complaint with your supervisory authority.</p>\n<h2>8. Security</h2>\n<p>We apply appropriate technical and organizational measures to protect data (HTTPS encryption, restricted access, security updates).</p>\n<h2>9. Updates</h2>\n<p>This policy may be updated periodically; the current version is published on this page. Last updated: {$date}.</p>\n<p><em>This document is an automatically generated template based on company data and does not constitute legal advice. We recommend review by a qualified professional.</em></p>";
+        return "<h2>1. Who we are</h2>\n<p><strong>{$host}</strong> is operated by <strong>{$id_line_en}</strong> (\"{$name}\").{$contact_en}</p>\n<h2>2. Data we collect</h2>\n<p>We collect data you provide directly (e.g. via contact forms: name, email address, phone number, message content) and data collected automatically through cookies and similar technologies (IP address, browser type, pages visited, visit duration), subject to your consent.</p>\n<h2>3. Purposes and legal bases</h2>\n<p>We process data to: (a) respond to your requests — legal basis: pre-contractual steps or legitimate interest; (b) analyze traffic and improve the website — legal basis: consent; (c) marketing and personalized advertising — legal basis: consent; (d) comply with legal obligations.</p>\n<h2>4. Cookies</h2>\n<p>This website uses necessary cookies (essential for operation), statistics cookies and marketing cookies. Statistics and marketing cookies are activated only with your consent, given through the consent banner. You can change your choice at any time here: [pcc_consent_link]. The full list of cookies is available in the banner's preferences panel.</p>\n<h2>5. Data recipients</h2>\n<p>Data may be shared with service providers (web hosting, analytics services such as Google Analytics, advertising platforms) acting as processors, and with public authorities where required by law. Some providers (e.g. Google) may transfer data outside the EEA with appropriate safeguards (standard contractual clauses).</p>\n<h2>6. Retention</h2>\n<p>We keep data only as long as necessary for the purposes above: form data — until the request is resolved and at most 3 years; cookie consent records — 12 months; analytics data — according to the analytics service settings.</p>\n<h2>7. Your rights</h2>\n<p>Under the GDPR you have the rights of access, rectification, erasure, restriction, portability, objection, and the right to withdraw consent at any time without affecting prior processing. To exercise your rights, {$rights_en}. You may also lodge a complaint with your supervisory authority.</p>\n<h2>8. Security</h2>\n<p>We apply appropriate technical and organizational measures to protect data (HTTPS encryption, restricted access, security updates).</p>\n<h2>9. Updates</h2>\n<p>This policy may be updated periodically; the current version is published on this page. Last updated: {$date}.</p>\n<p><em>This document is an automatically generated template based on company data and does not constitute legal advice. We recommend review by a qualified professional.</em></p>";
     }
-    return "<h2>1. General information</h2>\n<p><strong>{$host}</strong> is operated by <strong>{$id_line_en}</strong> (\"{$name}\"). {$contact_en}.</p>\n<h2>2. Acceptance of terms</h2>\n<p>By accessing and using this website you accept these terms and conditions. If you do not agree, please do not use the website.</p>\n<h2>3. Website content</h2>\n<p>The content of this website (texts, images, graphics, logos) is the property of {$name} or its partners and is protected by copyright law. Reproduction without written consent is prohibited.</p>\n<h2>4. Use of the website</h2>\n<p>You agree to use the website lawfully and in good faith, without disrupting its operation, attempting unauthorized access, or transmitting unlawful or harmful content.</p>\n<h2>5. Services and information</h2>\n<p>Published information is for informational purposes. {$name} makes reasonable efforts to keep it accurate but does not guarantee completeness or timeliness, and may change content without prior notice.</p>\n<h2>6. Limitation of liability</h2>\n<p>{$name} is not liable for direct or indirect damages resulting from the use of, or inability to use, this website, or from third-party actions (including linked websites).</p>\n<h2>7. Data protection</h2>\n<p>The processing of personal data is described in the Privacy Policy, and cookie preferences can be managed at any time here: [pcc_consent_link].</p>\n<h2>8. Governing law</h2>\n<p>These terms are governed by applicable law. Disputes will be resolved amicably or, failing that, by the competent courts. Consumers may also use the EU online dispute resolution platform (ec.europa.eu/consumers/odr).</p>\n<h2>9. Changes</h2>\n<p>{$name} may amend these terms; the current version is published on this page. Last updated: {$date}.</p>\n<p><em>This document is an automatically generated template based on company data and does not constitute legal advice. We recommend review by a qualified professional.</em></p>";
+    return "<h2>1. General information</h2>\n<p><strong>{$host}</strong> is operated by <strong>{$id_line_en}</strong> (\"{$name}\").{$contact_en}</p>\n<h2>2. Acceptance of terms</h2>\n<p>By accessing and using this website you accept these terms and conditions. If you do not agree, please do not use the website.</p>\n<h2>3. Website content</h2>\n<p>The content of this website (texts, images, graphics, logos) is the property of {$name} or its partners and is protected by copyright law. Reproduction without written consent is prohibited.</p>\n<h2>4. Use of the website</h2>\n<p>You agree to use the website lawfully and in good faith, without disrupting its operation, attempting unauthorized access, or transmitting unlawful or harmful content.</p>\n<h2>5. Services and information</h2>\n<p>Published information is for informational purposes. {$name} makes reasonable efforts to keep it accurate but does not guarantee completeness or timeliness, and may change content without prior notice.</p>\n<h2>6. Limitation of liability</h2>\n<p>{$name} is not liable for direct or indirect damages resulting from the use of, or inability to use, this website, or from third-party actions (including linked websites).</p>\n<h2>7. Data protection</h2>\n<p>The processing of personal data is described in the Privacy Policy, and cookie preferences can be managed at any time here: [pcc_consent_link].</p>\n<h2>8. Governing law</h2>\n<p>These terms are governed by applicable law. Disputes will be resolved amicably or, failing that, by the competent courts. Consumers may also use the EU online dispute resolution platform (ec.europa.eu/consumers/odr).</p>\n<h2>9. Changes</h2>\n<p>{$name} may amend these terms; the current version is published on this page. Last updated: {$date}.</p>\n<p><em>This document is an automatically generated template based on company data and does not constitute legal advice. We recommend review by a qualified professional.</em></p>";
 }
 
-function pcc_legal_page_title( $type ) {
-    $lang = strtolower( substr( get_locale(), 0, 2 ) );
+function pcc_legal_page_title( $type, $lang = '' ) {
+    $lang = $lang ?: strtolower( substr( get_locale(), 0, 2 ) );
     $titles = array(
         'privacy' => array( 'ro' => 'Politica de Confidențialitate', 'en' => 'Privacy Policy', 'de' => 'Datenschutzerklärung', 'fr' => 'Politique de Confidentialité', 'it' => 'Informativa sulla Privacy', 'es' => 'Política de Privacidad' ),
         'terms'   => array( 'ro' => 'Termeni și Condiții', 'en' => 'Terms and Conditions', 'de' => 'AGB', 'fr' => 'Conditions Générales', 'it' => 'Termini e Condizioni', 'es' => 'Términos y Condiciones' ),
@@ -1726,15 +1821,32 @@ function pcc_ajax_generate_legal() {
 
     $legal = pcc_get_legal_settings();
 
-    // 1) A page we generated before (even trashed): update / restore it.
-    $ours = pcc_get_generated_legal_page( $type, true );
+    // Optional language (multilingual sites): validated against the
+    // languages Polylang actually has.
+    $lang      = sanitize_text_field( wp_unslash( $_POST['lang'] ?? '' ) );
+    $site_lang = pcc_site_languages();
+    if ( $lang && ! in_array( $lang, $site_lang, true ) ) {
+        wp_send_json_error( 'Unknown language' );
+    }
+    $is_default_lang = ! $lang || $lang === pcc_site_default_language();
 
-    // 2) Otherwise: if ANY existing page is detected, refuse to generate —
-    //    select the existing page instead. No duplicates, ever.
+    // 1) A page we generated before (even trashed): update / restore it.
+    $ours = ( $lang && ! $is_default_lang )
+        ? pcc_get_generated_legal_page_lang( $type, $lang, true )
+        : pcc_get_generated_legal_page( $type, true );
+
+    // 2) Otherwise: if an existing page is found for this language, refuse
+    //    to generate — select the existing page instead. No duplicates.
     if ( ! $ours ) {
-        $detected = pcc_detect_legal_page( $type );
+        $detected = ( $lang && ! $is_default_lang )
+            ? pcc_resolve_legal_page( $type, $lang )
+            : pcc_detect_legal_page( $type );
         if ( $detected ) {
-            $legal[ $type ] = $detected;
+            if ( $lang && ! $is_default_lang ) {
+                $legal['i18n'][ $type ][ $lang ] = $detected;
+            } else {
+                $legal[ $type ] = $detected;
+            }
             update_option( 'pcc_legal_pages', $legal, false );
             wp_send_json_success( array(
                 'action' => 'selected_existing',
@@ -1746,8 +1858,9 @@ function pcc_ajax_generate_legal() {
         }
     }
 
-    $company = pcc_get_company();
-    $content = pcc_legal_template( $type, $company );
+    $company  = pcc_get_company();
+    $tpl_lang = $lang ?: '';
+    $content  = pcc_legal_template( $type, $company, $tpl_lang );
 
     if ( $ours ) {
         if ( 'trash' === get_post_status( $ours->ID ) ) {
@@ -1764,7 +1877,7 @@ function pcc_ajax_generate_legal() {
         $page_id = wp_insert_post( array(
             'post_type'    => 'page',
             'post_status'  => 'publish',
-            'post_title'   => pcc_legal_page_title( $type ),
+            'post_title'   => pcc_legal_page_title( $type, $tpl_lang ),
             'post_content' => $content,
         ) );
         if ( is_wp_error( $page_id ) || ! $page_id ) {
@@ -1774,10 +1887,30 @@ function pcc_ajax_generate_legal() {
         $action = 'created';
     }
 
-    $legal[ $type ] = $page_id;
+    // Language bookkeeping (Polylang): set the page language and link it
+    // to the default-language page as a translation.
+    $effective_lang = $lang ?: pcc_site_default_language();
+    if ( $effective_lang ) {
+        update_post_meta( $page_id, '_pcc_legal_lang', $effective_lang );
+        if ( function_exists( 'pll_set_post_language' ) ) {
+            pll_set_post_language( $page_id, $effective_lang );
+        }
+        $default_id = (int) ( $legal[ $type ] ?? 0 );
+        if ( $default_id && $default_id !== $page_id && function_exists( 'pll_save_post_translations' ) && function_exists( 'pll_get_post_translations' ) ) {
+            $translations = pll_get_post_translations( $default_id );
+            $translations[ $effective_lang ] = $page_id;
+            pll_save_post_translations( $translations );
+        }
+    }
+
+    if ( $lang && ! $is_default_lang ) {
+        $legal['i18n'][ $type ][ $lang ] = $page_id;
+    } else {
+        $legal[ $type ] = $page_id;
+    }
     update_option( 'pcc_legal_pages', $legal, false );
 
-    if ( 'privacy' === $type && ! get_option( 'wp_page_for_privacy_policy' ) ) {
+    if ( 'privacy' === $type && $is_default_lang && ! get_option( 'wp_page_for_privacy_policy' ) ) {
         update_option( 'wp_page_for_privacy_policy', $page_id );
     }
 
@@ -1858,13 +1991,56 @@ function pcc_admin_legal_page() {
                     'option_none_value' => '0',
                 ) ); ?>
                 </label>
-                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" <?php disabled( (bool) $current && ! $is_ours ); ?>>
+                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" data-lang="" <?php disabled( (bool) $current && ! $is_ours ); ?>>
                     <?php echo $is_ours ? 'Regenerate content' : 'Generate page'; ?>
                 </button>
                 <?php if ( $current && ! $is_ours ) : ?>
                     <span style="color:#666;">Generation is disabled because a page already exists &mdash; no duplicates.</span>
                 <?php endif; ?>
             </div>
+
+            <?php
+            // Multilingual sites (Polylang): one page per language.
+            $pcc_langs = pcc_site_languages();
+            $pcc_def   = pcc_site_default_language();
+            if ( count( $pcc_langs ) > 1 ) :
+            ?>
+            <h4 style="margin:16px 0 6px;">Languages</h4>
+            <table class="widefat striped" style="max-width:720px;">
+                <thead><tr><th>Language</th><th>Page</th><th style="width:180px;">Action</th></tr></thead>
+                <tbody>
+                <?php foreach ( $pcc_langs as $pcc_l ) :
+                    $is_def  = ( $pcc_l === $pcc_def );
+                    $rid     = $is_def ? $current : pcc_resolve_legal_page( $type, $pcc_l );
+                    $r_ours  = $rid && get_post_meta( $rid, '_pcc_legal_type', true ) === $type;
+                ?>
+                    <tr>
+                        <td><strong><?php echo esc_html( strtoupper( $pcc_l ) ); ?></strong><?php echo $is_def ? ' <em>(default)</em>' : ''; ?></td>
+                        <td>
+                            <?php if ( $rid ) : ?>
+                                <?php echo esc_html( get_the_title( $rid ) ); ?>
+                                &mdash; <a href="<?php echo esc_url( get_permalink( $rid ) ); ?>" target="_blank" rel="noopener">view</a>
+                                &middot; <a href="<?php echo esc_url( get_edit_post_link( $rid, 'raw' ) ); ?>" target="_blank" rel="noopener">edit</a>
+                                <?php echo $r_ours ? ' <em>(generated)</em>' : ' <em>(existing)</em>'; ?>
+                            <?php else : ?>
+                                <span style="color:#b45309;">missing</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( $is_def ) : ?>
+                                <span style="color:#666;">managed above</span>
+                            <?php else : ?>
+                                <button type="button" class="button pcc-generate-legal" data-type="<?php echo esc_attr( $type ); ?>" data-lang="<?php echo esc_attr( $pcc_l ); ?>" <?php disabled( (bool) $rid && ! $r_ours ); ?>>
+                                    <?php echo $r_ours ? 'Regenerate' : 'Generate (' . esc_html( strtoupper( $pcc_l ) ) . ')'; ?>
+                                </button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <p style="color:#666;margin-top:6px;">Generated translations are linked automatically as Polylang translations of the default-language page. Templates exist in Romanian and English; other languages use the English template with a localized title.</p>
+            <?php endif; ?>
         </div>
         <?php endforeach; ?>
 
@@ -1921,6 +2097,7 @@ function pcc_admin_legal_page() {
                         fd.append('action', 'pcc_generate_legal');
                         fd.append('nonce', nonce);
                         fd.append('type', btn.dataset.type);
+                        fd.append('lang', btn.dataset.lang || '');
                         return fetch(ajax, {method:'POST', body:fd});
                     }).then(function(r){return r.json();}).then(function(res){
                         if (res.success) {
